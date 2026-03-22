@@ -1,0 +1,37 @@
+"""
+Video Editing Tool — FastAPI backend
+"""
+
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+import queue as job_queue
+from routes import sessions, processing, subtitles, export
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    job_queue.start_worker()
+    yield
+
+
+app = FastAPI(title="Video Editing Tool API", version="0.1.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Vite dev server
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(sessions.router)
+app.include_router(processing.router)
+app.include_router(subtitles.router)
+app.include_router(export.router)
+
+
+@app.get("/health")
+async def health():
+    return {"ok": True}

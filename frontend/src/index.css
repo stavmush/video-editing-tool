@@ -1,0 +1,49 @@
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  background: #0f1117;
+  color: #e0e0e0;
+}
+
+button {
+  cursor: pointer;
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background: #1e2130;
+  color: #e0e0e0;
+  transition: background 0.15s;
+}
+button:hover:not(:disabled) { background: #2a2f45; }
+button:disabled { opacity: 0.45; cursor: default; }
+
+button.primary {
+  background: #4a6cf7;
+  border-color: #4a6cf7;
+  color: #fff;
+}
+button.primary:hover:not(:disabled) { background: #3a5ce6; }
+
+input, select {
+  background: #1e2130;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #e0e0e0;
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+h2 { font-size: 16px; font-weight: 500; margin: 0 0 12px; color: #aaa; }
+
+.card {
+  background: #161b2e;
+  border: 1px solid #2a2f45;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
