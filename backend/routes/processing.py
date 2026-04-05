@@ -11,13 +11,8 @@ import os
 from fastapi import APIRouter, HTTPException
 from sse_starlette.sse import EventSourceResponse
 import session_store
-import queue as job_queue
+import job_queue
 from models import TranscribeRequest, TranslateRequest
-from utils.transcribe import transcribe_video, transcribe_to_english, denoise_audio_track
-from utils.translate import translate_segments
-from utils.video import replace_audio_track
-from utils.srt_utils import segments_to_dataframe
-
 router = APIRouter(prefix="/sessions", tags=["processing"])
 
 # session_id → asyncio.Queue of SSE events
@@ -65,14 +60,22 @@ async def transcribe(session_id: str, body: TranscribeRequest):
 
     async def job():
         session_store.update_session(session_id, status="processing", current_job="transcribing", progress=0.0)
+        loop = asyncio.get_event_loop()
 
-        def on_progress(fraction: float):
-            asyncio.get_event_loop().call_soon_threadsafe(
-                _sse_queues[session_id].put_nowait,
-                {"type": "progress", "value": fraction, "message": f"Transcribing... {int(fraction * 100)}%"},
+        def on_progress(fraction: float, message: str = ""):
+            q = _sse_queue(session_id)
+            loop.call_soon_threadsafe(
+                q.put_nowait,
+                {"type": "progress", "value": fraction, "message": message},
             )
 
         try:
+            from utils.transcribe import transcribe_video, is_model_cached
+            if not is_model_cached(body.model_size):
+                on_progress(0.0, "Downloading model… (first time only)")
+            else:
+                on_progress(0.0, "Loading model…")
+            print(f"[transcribe] starting job for session {session_id}, model={body.model_size}")
             loop = asyncio.get_event_loop()
             segments, detected_lang = await loop.run_in_executor(
                 None,
@@ -92,6 +95,7 @@ async def transcribe(session_id: str, body: TranscribeRequest):
             )
             await _push(session_id, "done", 1.0, "Transcription complete")
         except Exception as e:
+            print(f"[transcribe] error: {e}")
             session_store.update_session(session_id, status="error", current_job=None, error=str(e))
             await _push(session_id, "error", message=str(e))
 
@@ -115,6 +119,8 @@ async def translate(session_id: str, body: TranslateRequest):
         session_store.update_session(session_id, status="processing", current_job="translating", progress=0.0)
         await _push(session_id, "progress", 0.0, "Translating...")
         try:
+            from utils.transcribe import transcribe_to_english
+            from utils.translate import translate_segments
             loop = asyncio.get_event_loop()
             src = body.source_lang
             tgt = body.target_lang
@@ -173,6 +179,8 @@ async def denoise(session_id: str):
         session_store.update_session(session_id, status="processing", current_job="denoising", progress=0.0)
         await _push(session_id, "progress", 0.0, "Reducing background noise...")
         try:
+            from utils.transcribe import denoise_audio_track
+            from utils.video import replace_audio_track
             loop = asyncio.get_event_loop()
             denoised_wav = os.path.join(session_store.get_data(session_id)["session_dir"], "denoised_audio.wav")
             denoised_video = os.path.join(session_store.get_data(session_id)["session_dir"], "video_denoised.mp4")

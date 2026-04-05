@@ -10,17 +10,29 @@ interface Props {
   sessionId: string;
 }
 
+const RTL_REGEX = /[\u0590-\u05FF\u0600-\u06FF\u0700-\u074F]/;
+
+function isRtlText(rows: Segment[]): boolean {
+  const sample = rows.slice(0, 5).map((r) => r.text).join(" ");
+  const rtlCount = (sample.match(RTL_REGEX) ?? []).length;
+  return rtlCount > sample.length * 0.3;
+}
+
 export default function SubtitleEditor({ sessionId }: Props) {
   const [rows, setRows] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [rtl, setRtl] = useState(false);
   const gridRef = useRef<GridApi | null>(null);
 
   useEffect(() => {
     setLoading(true);
     getSubtitles(sessionId)
-      .then(setRows)
+      .then((data) => {
+        setRows(data);
+        setRtl(isRtlText(data));
+      })
       .finally(() => setLoading(false));
   }, [sessionId]);
 
@@ -29,9 +41,14 @@ export default function SubtitleEditor({ sessionId }: Props) {
       { field: "id", headerName: "#", width: 60, editable: false },
       { field: "start", headerName: "Start", width: 130 },
       { field: "end", headerName: "End", width: 130 },
-      { field: "text", headerName: "Text", flex: 1 },
+      {
+        field: "text",
+        headerName: "Text",
+        flex: 1,
+        cellStyle: rtl ? { direction: "rtl", textAlign: "right" } : {},
+      },
     ],
-    [],
+    [rtl],
   );
 
   const onCellEditingStopped = useCallback(

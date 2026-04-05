@@ -3,17 +3,15 @@ import tempfile
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 import session_store
-import queue as job_queue
+import job_queue
 from models import EmbedRequest, BurnRequest
-from utils.srt_utils import dataframe_to_srt, apply_rtl_marks
-from utils.video import embed_subtitles, embed_subtitles_multi, burn_subtitles
 import pandas as pd
 
 router = APIRouter(prefix="/sessions", tags=["export"])
 
 
 def _segments_to_srt(segments: list[dict]) -> str:
-    from utils.srt_utils import _seconds_to_timedelta, _srt_timestamp_to_str, SUBTITLE_COLUMNS
+    from utils.srt_utils import _seconds_to_timedelta, _srt_timestamp_to_str, SUBTITLE_COLUMNS, dataframe_to_srt
     rows = []
     for seg in segments:
         start = _srt_timestamp_to_str(_seconds_to_timedelta(seg["start"])) if isinstance(seg["start"], float) else seg["start"]
@@ -32,6 +30,7 @@ async def export_srt(session_id: str, rtl_marks: bool = False):
     if not data["segments"]:
         raise HTTPException(status_code=400, detail="No subtitles to export")
 
+    from utils.srt_utils import apply_rtl_marks
     srt_content = _segments_to_srt(data["segments"])
     if rtl_marks:
         srt_content = apply_rtl_marks(srt_content)
@@ -55,6 +54,8 @@ async def export_embed(session_id: str, body: EmbedRequest):
         raise HTTPException(status_code=400, detail="No video uploaded")
 
     async def job():
+        from utils.srt_utils import apply_rtl_marks
+        from utils.video import embed_subtitles, embed_subtitles_multi
         srt_content = _segments_to_srt(data["segments"])
         if body.rtl_marks:
             srt_content = apply_rtl_marks(srt_content)
@@ -96,6 +97,7 @@ async def export_burn(session_id: str, body: BurnRequest):
         raise HTTPException(status_code=400, detail="No subtitles available")
 
     async def job():
+        from utils.video import burn_subtitles
         srt_path = os.path.join(data["session_dir"], "subtitles.srt")
         with open(srt_path, "w", encoding="utf-8") as f:
             f.write(_segments_to_srt(data["segments"]))

@@ -22,16 +22,15 @@ import tempfile
 from typing import Any, Callable
 
 import numpy as np
-import noisereduce as nr
 import soundfile as sf
 
-import streamlit as st
 from faster_whisper import WhisperModel
 
 Segment = dict[str, Any]
+ProgressFn = Callable[[float, str], None]
 
-# 10-minute chunks keep peak audio memory ~50 MB regardless of video length.
-_CHUNK_SECONDS = 600
+# 5-minute chunks keep peak audio memory ~25 MB regardless of video length.
+_CHUNK_SECONDS = 300
 
 # beam_size=1 (greedy) for large models: ~20% faster, meaningfully less
 # decoder memory. Accuracy is still excellent at that model size.
@@ -44,12 +43,44 @@ _BEAM_SIZE: dict[str, int] = {
     "large-v3": 1,
 }
 
+_MODEL_ID = "Systran/faster-whisper-{}"
+_model_cache: dict[str, WhisperModel] = {}
 
-@st.cache_resource(show_spinner=False)
-def _load_model(model_size: str) -> WhisperModel:
+
+def is_model_cached(model_size: str) -> bool:
+    if model_size in _model_cache:
+        return True
+    from huggingface_hub import try_to_load_from_cache
+    result = try_to_load_from_cache(_MODEL_ID.format(model_size), "config.json")
+    return result is not None
+
+
+def _load_model(model_size: str, on_progress: ProgressFn | None = None) -> WhisperModel:
     """Download (first run) and cache the faster-whisper model."""
+    if model_size in _model_cache:
+        return _model_cache[model_size]
+
+    model_id = _MODEL_ID.format(model_size)
+
+    if not is_model_cached(model_size):
+        try:
+            from huggingface_hub import list_repo_files, hf_hub_download
+            files = [f for f in list_repo_files(model_id) if not f.startswith(".")]
+            total = len(files)
+            for i, filename in enumerate(files):
+                if on_progress:
+                    on_progress(i / total, f"Downloading model: {filename} ({i + 1}/{total})")
+                hf_hub_download(repo_id=model_id, filename=filename)
+        except Exception:
+            pass  # fall through — WhisperModel handles its own download
+
+    if on_progress:
+        on_progress(0.0, "Loading model into memory…")
+
     gc.collect()
-    return WhisperModel(model_size, device="cpu", compute_type="int8")
+    model = WhisperModel(model_size, device="cpu", compute_type="int8")
+    _model_cache[model_size] = model
+    return model
 
 
 def _get_duration(video_path: str) -> float:
@@ -92,6 +123,7 @@ def _denoise_audio(audio_path: str) -> tuple[float, float, dict[str, float]]:
     Returns (rms_before, rms_after, band_reductions) where band_reductions is
     a dict of {band_name: % energy removed} for bass, speech, and treble bands.
     """
+    import noisereduce as nr
     data, rate = sf.read(audio_path)
     rms_before = float(np.sqrt(np.mean(data ** 2)))
     reduced = nr.reduce_noise(y=data, sr=rate, stationary=False)
@@ -132,7 +164,7 @@ def _transcribe_chunked(
     video_path: str,
     task: str,                                   # "transcribe" or "translate"
     model_size: str,
-    on_progress: Callable[[float], None] | None,
+    on_progress: ProgressFn | None,
 ) -> tuple[list[Segment], str]:
     """
     Transcribe or translate video audio in memory-bounded 10-minute chunks.
@@ -141,7 +173,7 @@ def _transcribe_chunked(
     Timestamps are offset so the returned segments have global video times.
     """
     total = _get_duration(video_path)
-    model = _load_model(model_size)
+    model = _load_model(model_size, on_progress)
     beam_size = _BEAM_SIZE.get(model_size, 5)
 
     all_segments: list[Segment] = []
@@ -175,7 +207,8 @@ def _transcribe_chunked(
                     })
                     seg_id += 1
                 if on_progress and total > 0:
-                    on_progress(min((chunk_start + float(seg.end)) / total, 1.0))
+                    pct = min((chunk_start + float(seg.end)) / total, 1.0)
+                    on_progress(pct, f"Transcribing… {int(pct * 100)}%")
         finally:
             os.unlink(audio_path)
 
@@ -188,7 +221,7 @@ def _transcribe_chunked(
 def transcribe_video(
     video_path: str,
     model_size: str,
-    on_progress: Callable[[float], None] | None = None,
+    on_progress: ProgressFn | None = None,
 ) -> tuple[list[Segment], str]:
     """Transcribe video audio in its original language.
 
@@ -200,7 +233,7 @@ def transcribe_video(
 def transcribe_to_english(
     video_path: str,
     model_size: str,
-    on_progress: Callable[[float], None] | None = None,
+    on_progress: ProgressFn | None = None,
 ) -> list[Segment]:
     """Use Whisper's built-in translate task to produce English-language segments.
 
@@ -231,6 +264,7 @@ def denoise_audio_track(
         )
         data, rate = sf.read(tmp.name)
         # noisereduce expects (channels, samples) for multichannel; soundfile gives (samples, channels)
+        import noisereduce as nr
         audio_in = data.T if data.ndim > 1 else data
         rms_before = float(np.sqrt(np.mean(data ** 2)))
         reduced_t = nr.reduce_noise(y=audio_in, sr=rate, stationary=False)

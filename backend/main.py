@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-import queue as job_queue
+import job_queue
 from routes import sessions, processing, subtitles, export
 
 

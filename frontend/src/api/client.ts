@@ -31,29 +31,38 @@ export function deleteSession(id: string): Promise<void> {
 
 // ── Upload ────────────────────────────────────────────────────────────────────
 
-export async function uploadVideo(
+export function uploadVideo(
   sessionId: string,
   file: File,
   onProgress?: (pct: number) => void,
-): Promise<void> {
-  const CHUNK = 1024 * 1024; // 1 MB
-  const total = Math.ceil(file.size / CHUNK);
-
-  for (let i = 0; i < total; i++) {
-    const chunk = file.slice(i * CHUNK, (i + 1) * CHUNK);
+  extractSubtitles = false,
+): Promise<Session> {
+  return new Promise((resolve, reject) => {
     const form = new FormData();
-    form.append("chunk", chunk, file.name);
-    form.append("chunk_index", String(i));
-    form.append("total_chunks", String(total));
-    form.append("filename", file.name);
+    form.append("file", file, file.name);
 
-    await request<unknown>(`${BASE}/${sessionId}/upload`, {
-      method: "POST",
-      body: form,
-    });
+    const url = `${BASE}/${sessionId}/upload${extractSubtitles ? "?extract_subtitles=true" : ""}`;
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
 
-    onProgress?.((i + 1) / total);
-  }
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress?.(e.loaded / e.total);
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText) as Session);
+      else reject(new Error(`${xhr.status}: ${xhr.responseText}`));
+    };
+
+    xhr.onerror = () => reject(new Error("Upload failed"));
+    xhr.send(form);
+  });
+}
+
+export function uploadSrt(sessionId: string, file: File): Promise<Session> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  return request<Session>(`${BASE}/${sessionId}/upload-srt`, { method: "POST", body: form });
 }
 
 // ── Processing ────────────────────────────────────────────────────────────────
@@ -151,6 +160,10 @@ export function exportBurn(
 
 export function downloadExportUrl(sessionId: string): string {
   return `${BASE}/${sessionId}/export/download`;
+}
+
+export function videoUrl(sessionId: string): string {
+  return `${BASE}/${sessionId}/video`;
 }
 
 // ── SSE Progress ──────────────────────────────────────────────────────────────

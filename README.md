@@ -26,7 +26,7 @@ Each operation (transcribe, translate, denoise, export) is an independent API ca
 
 ```bash
 cd backend
-python -m venv .venv && source .venv/bin/activate
+python -m venv video_edit && source video_edit/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```

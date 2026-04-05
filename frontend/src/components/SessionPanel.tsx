@@ -8,12 +8,23 @@ import {
   translate,
   denoise,
   uploadVideo,
+  uploadSrt,
   exportEmbed,
   exportBurn,
   downloadExportUrl,
   exportSrt,
+  videoUrl,
 } from "../api/client";
 import SubtitleEditor from "./SubtitleEditor";
+
+type UploadMode = "video" | "video-with-subs" | "video-with-srt" | "srt-only";
+
+const UPLOAD_MODES: { value: UploadMode; label: string; hint: string }[] = [
+  { value: "video",            label: "New video",              hint: "Upload a video to transcribe" },
+  { value: "video-with-subs",  label: "Video + embedded subs",  hint: "Extract subtitles already baked into the file" },
+  { value: "video-with-srt",   label: "Video + SRT file",       hint: "Upload a video and a matching SRT file" },
+  { value: "srt-only",         label: "SRT file only",          hint: "Edit an existing subtitle file without video" },
+];
 
 interface Props {
   session: Session;
@@ -36,6 +47,7 @@ const LANG_OPTIONS = [
 export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
   const [progress, setProgress] = useState<{ msg: string; pct: number } | null>(null);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
+  const [uploadMode, setUploadMode] = useState<UploadMode>("video");
   const [model, setModel] = useState("large-v3");
   const [srcLang, setSrcLang] = useState("auto");
   const [tgtLang, setTgtLang] = useState("he");
@@ -43,6 +55,7 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
   const [exportMode, setExportMode] = useState<"embed" | "burn">("embed");
   const [rtl, setRtl] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const srtRef = useRef<HTMLInputElement>(null);
 
   const s = session;
   const busy = s.status === "queued" || s.status === "processing";
@@ -68,9 +81,32 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
 
   async function handleUpload(file: File) {
     setUploadPct(0);
-    await uploadVideo(s.id, file, (pct) => setUploadPct(Math.round(pct * 100)));
-    setUploadPct(null);
-    await refresh();
+    try {
+      let updated: Session;
+      if (uploadMode === "srt-only") {
+        updated = await uploadSrt(s.id, file);
+      } else {
+        updated = await uploadVideo(
+          s.id, file,
+          (pct) => setUploadPct(Math.round(pct * 100)),
+          uploadMode === "video-with-subs",
+        );
+      }
+      onUpdate(updated);
+    } catch (err) {
+      console.error("Upload failed:", err);
+    } finally {
+      setUploadPct(null);
+    }
+  }
+
+  async function handleSrtUpload(file: File) {
+    try {
+      const updated = await uploadSrt(s.id, file);
+      onUpdate(updated);
+    } catch (err) {
+      console.error("SRT upload failed:", err);
+    }
   }
 
   async function handleTranscribe() {
@@ -102,9 +138,9 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
     watchProgress();
   }
 
-  async function handleDelete() {
-    await deleteSession(s.id);
+  function handleDelete() {
     onRemove(s.id);
+    deleteSession(s.id).catch(() => {});
   }
 
   return (
@@ -121,25 +157,74 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
         </button>
       </div>
 
+      {/* Video preview */}
+      {s.capabilities.has_video && (
+        <video
+          src={videoUrl(s.id)}
+          controls
+          style={{ width: "100%", borderRadius: 6, marginBottom: 14, maxHeight: 320, background: "#000" }}
+        />
+      )}
+
       {/* Upload */}
-      {!s.capabilities.has_video && (
-        <div style={{ marginBottom: 12 }}>
+      {!s.capabilities.has_video && !s.capabilities.has_subtitles && (
+        <div style={{ marginBottom: 14 }}>
+          {/* Mode selector */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+            {UPLOAD_MODES.map((m) => (
+              <button
+                key={m.value}
+                onClick={() => setUploadMode(m.value)}
+                style={{
+                  padding: "5px 12px",
+                  borderRadius: 4,
+                  border: "1px solid",
+                  borderColor: uploadMode === m.value ? "#4a6cf7" : "#444",
+                  background: uploadMode === m.value ? "#1a2a5e" : "#1e2130",
+                  color: uploadMode === m.value ? "#fff" : "#aaa",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>
+            {UPLOAD_MODES.find((m) => m.value === uploadMode)?.hint}
+          </div>
+
+          {/* Hidden file inputs */}
           <input
+            key={uploadMode}
             ref={fileRef}
             type="file"
-            accept="video/*"
+            accept={uploadMode === "srt-only" ? ".srt" : "video/*"}
             style={{ display: "none" }}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void handleUpload(f);
-            }}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleUpload(f); }}
           />
-          <button onClick={() => fileRef.current?.click()} disabled={busy}>
-            Upload video
-          </button>
-          {uploadPct !== null && (
-            <span style={{ marginLeft: 12, color: "#aaa" }}>Uploading… {uploadPct}%</span>
-          )}
+          <input
+            ref={srtRef}
+            type="file"
+            accept=".srt"
+            style={{ display: "none" }}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleSrtUpload(f); }}
+          />
+
+          {/* Buttons */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button onClick={() => fileRef.current?.click()} disabled={busy}>
+              {uploadMode === "srt-only" ? "Choose SRT file" : "Choose video"}
+            </button>
+            {uploadMode === "video-with-srt" && (
+              <button onClick={() => srtRef.current?.click()} disabled={busy}>
+                Choose SRT file
+              </button>
+            )}
+            {uploadPct !== null && (
+              <span style={{ color: "#aaa", fontSize: 13 }}>Uploading… {uploadPct}%</span>
+            )}
+          </div>
         </div>
       )}
 
@@ -187,8 +272,19 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
 
       {/* Progress */}
       {(progress || busy) && (
-        <div style={{ margin: "10px 0", fontSize: 13, color: "#aaa" }}>
-          {progress ? `${progress.msg} (${Math.round(progress.pct * 100)}%)` : "Working…"}
+        <div style={{ margin: "10px 0" }}>
+          <div style={{ fontSize: 13, color: "#aaa", marginBottom: 6 }}>
+            {progress ? progress.msg : "Working…"}
+          </div>
+          <div style={{ background: "#2a2a2a", borderRadius: 4, height: 6, overflow: "hidden" }}>
+            <div style={{
+              background: "#6d7fe3",
+              height: "100%",
+              width: progress ? `${Math.round(progress.pct * 100)}%` : "100%",
+              transition: "width 0.4s ease",
+              animation: progress ? "none" : "indeterminate 1.4s ease infinite",
+            }} />
+          </div>
         </div>
       )}
 
