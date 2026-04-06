@@ -1,7 +1,7 @@
 import os
 import tempfile
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 import session_store
 import job_queue
 from models import EmbedRequest, BurnRequest
@@ -19,6 +19,43 @@ def _segments_to_srt(segments: list[dict]) -> str:
         rows.append({"index": seg["id"], "start": start, "end": end, "text": seg["text"]})
     df = pd.DataFrame(rows, columns=SUBTITLE_COLUMNS)
     return dataframe_to_srt(df)
+
+
+def _to_vtt_timestamp(ts) -> str:
+    """Convert a float (seconds) or SRT timestamp string to WebVTT HH:MM:SS.mmm format."""
+    if isinstance(ts, float):
+        total_ms = int(ts * 1000)
+    else:
+        hms, ms = ts.split(",")
+        h, m, s = hms.split(":")
+        total_ms = (int(h) * 3600 + int(m) * 60 + int(s)) * 1000 + int(ms)
+    h = total_ms // 3600000
+    m = (total_ms % 3600000) // 60000
+    s = (total_ms % 60000) // 1000
+    ms = total_ms % 1000
+    return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
+
+
+def _segments_to_vtt(segments: list[dict]) -> str:
+    lines = ["WEBVTT", ""]
+    for seg in segments:
+        start = _to_vtt_timestamp(seg["start"])
+        end = _to_vtt_timestamp(seg["end"])
+        lines.append(f"{start} --> {end}")
+        lines.append(seg["text"])
+        lines.append("")
+    return "\n".join(lines)
+
+
+@router.get("/{session_id}/subtitles/vtt")
+async def export_vtt(session_id: str):
+    session = session_store.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    data = session_store.get_data(session_id)
+    if not data["segments"]:
+        raise HTTPException(status_code=400, detail="No subtitles available")
+    return Response(content=_segments_to_vtt(data["segments"]), media_type="text/vtt")
 
 
 @router.get("/{session_id}/export/srt")

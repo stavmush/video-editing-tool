@@ -1,11 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Session } from "./api/types";
 import SessionPanel from "./components/SessionPanel";
-import { createSession } from "./api/client";
+import { createSession, listSessions } from "./api/client";
 
 export default function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [creating, setCreating] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    listSessions()
+      .then(setSessions)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   async function handleNew() {
     setCreating(true);
@@ -40,7 +48,8 @@ export default function App() {
         </button>
       </div>
 
-      {sessions.length === 0 && (
+      {loading && <p style={{ color: "#666" }}>Restoring sessions…</p>}
+      {!loading && sessions.length === 0 && (
         <p style={{ color: "#666" }}>
           No sessions yet. Click <strong>+ New session</strong> to start.
         </p>

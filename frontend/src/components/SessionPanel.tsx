@@ -52,10 +52,12 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
   const [srcLang, setSrcLang] = useState("auto");
   const [tgtLang, setTgtLang] = useState("he");
   const [showEditor, setShowEditor] = useState(false);
+  const [subtitleVersion, setSubtitleVersion] = useState(0);
   const [exportMode, setExportMode] = useState<"embed" | "burn">("embed");
   const [rtl, setRtl] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const srtRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const s = session;
   const busy = s.status === "queued" || s.status === "processing";
@@ -160,11 +162,31 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
       {/* Video preview */}
       {s.capabilities.has_video && (
         <video
+          ref={videoRef}
           src={videoUrl(s.id)}
           controls
           style={{ width: "100%", borderRadius: 6, marginBottom: 14, maxHeight: 320, background: "#000" }}
-        />
+        >
+          {s.capabilities.has_subtitles && (
+            <track
+              key={subtitleVersion}
+              kind="subtitles"
+              src={`/sessions/${s.id}/subtitles/vtt?v=${subtitleVersion}`}
+              label="Subtitles"
+              default
+            />
+          )}
+        </video>
       )}
+
+      {/* Hidden SRT input — kept outside conditionals so the ref stays valid after video upload */}
+      <input
+        ref={srtRef}
+        type="file"
+        accept=".srt"
+        style={{ display: "none" }}
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleSrtUpload(f); }}
+      />
 
       {/* Upload */}
       {!s.capabilities.has_video && !s.capabilities.has_subtitles && (
@@ -194,7 +216,7 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
             {UPLOAD_MODES.find((m) => m.value === uploadMode)?.hint}
           </div>
 
-          {/* Hidden file inputs */}
+          {/* Hidden video file input */}
           <input
             key={uploadMode}
             ref={fileRef}
@@ -202,13 +224,6 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
             accept={uploadMode === "srt-only" ? ".srt" : "video/*"}
             style={{ display: "none" }}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleUpload(f); }}
-          />
-          <input
-            ref={srtRef}
-            type="file"
-            accept=".srt"
-            style={{ display: "none" }}
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleSrtUpload(f); }}
           />
 
           {/* Buttons */}
@@ -225,6 +240,18 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
               <span style={{ color: "#aaa", fontSize: 13 }}>Uploading… {uploadPct}%</span>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Step 2 for video-with-srt: video is uploaded, now upload the SRT */}
+      {uploadMode === "video-with-srt" && s.capabilities.has_video && !s.capabilities.has_subtitles && (
+        <div style={{ marginBottom: 14 }}>
+          <p style={{ color: "#aaa", fontSize: 13, marginBottom: 8 }}>
+            Video uploaded. Now choose the matching SRT file.
+          </p>
+          <button onClick={() => srtRef.current?.click()} disabled={busy}>
+            Choose SRT file
+          </button>
         </div>
       )}
 
@@ -296,10 +323,21 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
       {/* Subtitle editor */}
       {s.capabilities.has_subtitles && (
         <div style={{ marginBottom: 12 }}>
-          <button onClick={() => setShowEditor((v) => !v)}>
-            {showEditor ? "Hide" : "Edit"} subtitles
-          </button>
-          {showEditor && <SubtitleEditor sessionId={s.id} />}
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: showEditor ? 8 : 0 }}>
+            <button onClick={() => setShowEditor((v) => !v)}>
+              {showEditor ? "Hide" : "Edit"} subtitles
+            </button>
+            <a href={exportSrt(s.id, rtl)} download="subtitles.srt">
+              <button>Download SRT</button>
+            </a>
+          </div>
+          {showEditor && (
+            <SubtitleEditor
+              sessionId={s.id}
+              onSave={() => setSubtitleVersion((v) => v + 1)}
+              onSeek={(seconds) => { if (videoRef.current) videoRef.current.currentTime = seconds; }}
+            />
+          )}
         </div>
       )}
 
@@ -317,9 +355,6 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
           <button onClick={handleExport} disabled={busy} className="primary">
             Export video
           </button>
-          <a href={exportSrt(s.id, rtl)} download="subtitles.srt">
-            <button>Download SRT</button>
-          </a>
           <a href={downloadExportUrl(s.id)} download="output.mp4">
             <button disabled={s.status !== "ready"}>Download video</button>
           </a>
