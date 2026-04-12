@@ -118,8 +118,9 @@ export function saveSubtitles(
 export function exportSrt(
   sessionId: string,
   rtlMarks = false,
+  filename = "subtitles.srt",
 ): string {
-  return `${BASE}/${sessionId}/export/srt?rtl_marks=${rtlMarks}`;
+  return `${BASE}/${sessionId}/export/srt?rtl_marks=${rtlMarks}&filename=${encodeURIComponent(filename)}`;
 }
 
 export function exportEmbed(

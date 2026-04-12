@@ -327,7 +327,7 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
             <button onClick={() => setShowEditor((v) => !v)}>
               {showEditor ? "Hide" : "Edit"} subtitles
             </button>
-            <a href={exportSrt(s.id, rtl)} download="subtitles.srt">
+            <a href={exportSrt(s.id, rtl, buildSrtFilename(s.video_filename, s.capabilities.source_language))} download>
               <button>Download SRT</button>
             </a>
           </div>
@@ -362,6 +362,22 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
       )}
     </div>
   );
+}
+
+const LANG_ABBREV: Record<string, string> = {
+  en: "eng", he: "heb", fr: "fra", de: "deu", es: "esp",
+  ar: "ara", ru: "rus", auto: "unk",
+};
+
+function buildSrtFilename(videoFilename: string | null, lang: string | null): string {
+  const base = videoFilename
+    ? videoFilename.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9א-ת_-]/g, "_")
+    : "subtitles";
+  const langCode = lang ? (LANG_ABBREV[lang] ?? lang) : "unk";
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+  return `${base}_srt_${langCode}_${ts}.srt`;
 }
 
 function statusColor(status: string) {

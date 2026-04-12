@@ -38,12 +38,22 @@ def _to_vtt_timestamp(ts) -> str:
 
 def _segments_to_vtt(segments: list[dict]) -> str:
     lines = ["WEBVTT", ""]
-    for seg in segments:
-        start = _to_vtt_timestamp(seg["start"])
-        end = _to_vtt_timestamp(seg["end"])
-        lines.append(f"{start} --> {end}")
-        lines.append(seg["text"])
-        lines.append("")
+    # Group consecutive segments that share the same start+end timestamps.
+    # Browsers stack simultaneous cues bottom-up, so we reverse each group so
+    # that the first segment in the editor appears at the top of the video.
+    i = 0
+    while i < len(segments):
+        j = i + 1
+        while j < len(segments) and segments[j]["start"] == segments[i]["start"] and segments[j]["end"] == segments[i]["end"]:
+            j += 1
+        group = segments[i:j]
+        for seg in reversed(group):
+            start = _to_vtt_timestamp(seg["start"])
+            end = _to_vtt_timestamp(seg["end"])
+            lines.append(f"{start} --> {end}")
+            lines.append(seg["text"])
+            lines.append("")
+        i = j
     return "\n".join(lines)
 
 
@@ -59,7 +69,7 @@ async def export_vtt(session_id: str):
 
 
 @router.get("/{session_id}/export/srt")
-async def export_srt(session_id: str, rtl_marks: bool = False):
+async def export_srt(session_id: str, rtl_marks: bool = False, filename: str = "subtitles.srt"):
     session = session_store.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -76,7 +86,7 @@ async def export_srt(session_id: str, rtl_marks: bool = False):
     with open(srt_path, "w", encoding="utf-8") as f:
         f.write(srt_content)
 
-    return FileResponse(srt_path, media_type="text/plain", filename="subtitles.srt")
+    return FileResponse(srt_path, media_type="text/plain", filename=filename)
 
 
 @router.post("/{session_id}/export/embed")
