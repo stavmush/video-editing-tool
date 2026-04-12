@@ -7,8 +7,8 @@ A web-based tool for automatic video transcription, translation, subtitle editin
 - **Transcription** — faster-whisper (CTranslate2), supports tiny/base/small/medium/large-v2/large-v3; audio processed in 5-minute chunks to keep RAM usage low
 - **Translation** — Google Translate via `deep-translator`; no PyTorch required
 - **Noise reduction** — Spectral gating via `noisereduce`, applied after transcription
-- **Subtitle editor** — AG Grid table with inline editing, insert/delete rows; auto-detects RTL text (Hebrew, Arabic)
-- **Export** — Soft-embed (MP4 with subtitle track), hard-burn (baked-in), or raw SRT download
+- **Subtitle editor** — AG Grid table with inline editing, insert/delete rows, add speaker (simultaneous cues); auto-detects RTL text (Hebrew, Arabic)
+- **Export** — Soft-embed (MP4 with subtitle track), hard-burn (baked-in), or raw SRT download with smart filename (video name + language + timestamp)
 - **Video preview** — Built-in player with HTTP range request support
 - **Multiple upload modes** — New video, video with embedded subs, video + separate SRT, or SRT-only
 - **Multi-session queue** — Run multiple files concurrently; jobs queue automatically
@@ -58,7 +58,7 @@ Open http://localhost:5173
 
 - `KMP_DUPLICATE_LIB_OK=TRUE` is required on macOS to prevent an OpenMP conflict between faster-whisper and numpy
 - Whisper models are downloaded on first use and cached in `~/.cache/huggingface/hub/`
-- Sessions are in-memory — restarting the backend clears all sessions
+- Sessions are persisted to disk (`/tmp/video-editing-tool/`) and restored on server restart; in-flight jobs (queued/processing) are reset to idle
 - Requires `ffmpeg` on PATH
 
 ## API overview

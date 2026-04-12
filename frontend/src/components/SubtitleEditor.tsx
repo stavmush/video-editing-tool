@@ -136,6 +136,24 @@ export default function SubtitleEditor({ sessionId, onSave, onSeek }: Props) {
     setRows(resequenced);
   }
 
+  function insertSpeakerRow() {
+    const selected = gridRef.current?.getSelectedRows() as Segment[] | undefined;
+    const current = rowsRef.current;
+    if (!selected?.length) return;
+    const afterId = selected[0].id;
+    const idx = current.findIndex((r) => r.id === afterId);
+    const prev = current[idx];
+    const newRow: Segment = {
+      id: 0,
+      start: prev.start,
+      end: prev.end,
+      text: "",
+    };
+    const resequenced = resequence([...current.slice(0, idx + 1), newRow, ...current.slice(idx + 1)]);
+    rowsRef.current = resequenced;
+    setRows(resequenced);
+  }
+
   function deleteSelected() {
     const selected = gridRef.current?.getSelectedRows() as Segment[] | undefined;
     if (!selected?.length) return;
@@ -170,6 +188,7 @@ export default function SubtitleEditor({ sessionId, onSave, onSeek }: Props) {
     <div style={{ marginTop: 12 }}>
       <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
         <button onClick={insertRowAfter}>+ Insert row</button>
+        <button onClick={insertSpeakerRow} title="Insert a new row with the same timestamps (for multiple speakers)">+ Add speaker</button>
         <button onClick={deleteSelected} style={{ color: "#e55", borderColor: "#e55" }}>
           Delete selected
         </button>
