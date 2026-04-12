@@ -7,11 +7,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import job_queue
+import session_store
 from routes import sessions, processing, subtitles, export
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    session_store.restore_sessions_from_disk()
     job_queue.start_worker()
     yield
 
