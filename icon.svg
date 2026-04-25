@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background rounded rect -->
+  <rect width="512" height="512" rx="100" ry="100" fill="#1a1a2e"/>
+
+  <!-- Film frame outer -->
+  <rect x="60" y="100" width="392" height="260" rx="18" ry="18" fill="#16213e" stroke="#0f3460" stroke-width="6"/>
+
+  <!-- Film strip perforations - left -->
+  <rect x="60" y="120" width="36" height="28" rx="5" fill="#0f3460"/>
+  <rect x="60" y="168" width="36" height="28" rx="5" fill="#0f3460"/>
+  <rect x="60" y="216" width="36" height="28" rx="5" fill="#0f3460"/>
+  <rect x="60" y="264" width="36" height="28" rx="5" fill="#0f3460"/>
+  <rect x="60" y="312" width="36" height="28" rx="5" fill="#0f3460"/>
+
+  <!-- Film strip perforations - right -->
+  <rect x="416" y="120" width="36" height="28" rx="5" fill="#0f3460"/>
+  <rect x="416" y="168" width="36" height="28" rx="5" fill="#0f3460"/>
+  <rect x="416" y="216" width="36" height="28" rx="5" fill="#0f3460"/>
+  <rect x="416" y="264" width="36" height="28" rx="5" fill="#0f3460"/>
+  <rect x="416" y="312" width="36" height="28" rx="5" fill="#0f3460"/>
+
+  <!-- Screen area -->
+  <rect x="112" y="120" width="288" height="180" rx="10" ry="10" fill="#0d0d1a"/>
+
+  <!-- Play button triangle -->
+  <polygon points="210,155 210,255 310,205" fill="#e94560" opacity="0.95"/>
+
+  <!-- Subtitle bar 1 -->
+  <rect x="112" y="315" width="288" height="16" rx="6" fill="#e94560" opacity="0.15"/>
+  <rect x="148" y="318" width="120" height="10" rx="4" fill="#e94560" opacity="0.85"/>
+  <rect x="276" y="318" width="90" height="10" rx="4" fill="#e94560" opacity="0.5"/>
+
+  <!-- Bottom text lines (subtitle editor feel) -->
+  <rect x="80" y="390" width="352" height="12" rx="5" fill="#0f3460"/>
+  <rect x="80" y="412" width="220" height="12" rx="5" fill="#0f3460"/>
+
+  <!-- Accent dot -->
+  <circle cx="430" cy="396" r="10" fill="#e94560"/>
+  <circle cx="430" cy="418" r="10" fill="#e94560" opacity="0.4"/>
+</svg>

@@ -50,12 +50,13 @@ const RtlTextareaEditor = forwardRef(function RtlTextareaEditor(
 
 interface Props {
   sessionId: string;
+  version?: number;
   onSave?: () => void;
   onSeek?: (seconds: number) => void;
 }
 
 
-export default function SubtitleEditor({ sessionId, onSave, onSeek }: Props) {
+export default function SubtitleEditor({ sessionId, version, onSave, onSeek }: Props) {
   const [rows, setRows] = useState<Segment[]>([]);
   const rowsRef = useRef<Segment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +69,7 @@ export default function SubtitleEditor({ sessionId, onSave, onSeek }: Props) {
     getSubtitles(sessionId)
       .then((data) => { setRows(data); rowsRef.current = data; })
       .finally(() => setLoading(false));
-  }, [sessionId]);
+  }, [sessionId, version]);
 
   const columnDefs = useMemo<ColDef<Segment>[]>(
     () => [

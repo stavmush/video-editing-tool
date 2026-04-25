@@ -29,11 +29,28 @@ async def upload_video(session_id: str, file: UploadFile = File(...), extract_su
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
 
     data = session_store.get_data(session_id)
-    video_path = os.path.join(data["session_dir"], f"video{ext}")
+    upload_path = os.path.join(data["session_dir"], f"video{ext}")
 
-    async with aiofiles.open(video_path, "wb") as f:
+    async with aiofiles.open(upload_path, "wb") as f:
         while chunk := await file.read(1024 * 1024):
             await f.write(chunk)
+
+    # Transcode non-MP4 uploads to MP4 so the browser can play the preview.
+    if ext != ".mp4":
+        import subprocess
+        mp4_path = os.path.join(data["session_dir"], "video.mp4")
+        result = subprocess.run(
+            ["ffmpeg", "-y", "-i", upload_path, "-c:v", "libx264", "-crf", "18",
+             "-preset", "fast", "-c:a", "aac", "-movflags", "+faststart", mp4_path],
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            os.remove(upload_path)
+            video_path = mp4_path
+        else:
+            video_path = upload_path  # fall back to original
+    else:
+        video_path = upload_path
 
     session_store.update_data(session_id, video_path=video_path)
     session_store.update_session(
@@ -117,7 +134,9 @@ async def stream_video(session_id: str, request: Request):
     range_header = request.headers.get("range")
 
     ext = os.path.splitext(video_path)[1].lower()
-    media_type = "video/mp4" if ext == ".mp4" else "video/webm" if ext == ".webm" else "video/x-matroska"
+    MEDIA_TYPES = {".mp4": "video/mp4", ".webm": "video/webm", ".mkv": "video/x-matroska",
+                   ".avi": "video/x-msvideo", ".mov": "video/quicktime"}
+    media_type = MEDIA_TYPES.get(ext, "application/octet-stream")
 
     if range_header:
         start, end = range_header.replace("bytes=", "").split("-")

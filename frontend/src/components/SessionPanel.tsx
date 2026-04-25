@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Session } from "../api/types";
 import {
   deleteSession,
@@ -44,6 +44,8 @@ const LANG_OPTIONS = [
   { code: "ru", label: "Russian" },
 ];
 
+let activeSessionId: string | null = null;
+
 export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
   const [progress, setProgress] = useState<{ msg: string; pct: number } | null>(null);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
@@ -61,6 +63,22 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
 
   const s = session;
   const busy = s.status === "queued" || s.status === "processing";
+
+  function seek(delta: number) {
+    if (videoRef.current) videoRef.current.currentTime += delta;
+  }
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!s.capabilities.has_video || activeSessionId !== s.id) return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key === "ArrowLeft")  { e.preventDefault(); seek(-5); }
+      if (e.key === "ArrowRight") { e.preventDefault(); seek(5); }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [s.capabilities.has_video]);
 
   async function refresh() {
     const updated = await getSession(s.id);
@@ -106,8 +124,11 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
     try {
       const updated = await uploadSrt(s.id, file);
       onUpdate(updated);
+      setSubtitleVersion((v) => v + 1);
     } catch (err) {
       console.error("SRT upload failed:", err);
+    } finally {
+      if (srtRef.current) srtRef.current.value = "";
     }
   }
 
@@ -161,22 +182,24 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
 
       {/* Video preview */}
       {s.capabilities.has_video && (
-        <video
-          ref={videoRef}
-          src={videoUrl(s.id)}
-          controls
-          style={{ width: "100%", borderRadius: 6, marginBottom: 14, maxHeight: 320, background: "#000" }}
-        >
-          {s.capabilities.has_subtitles && (
-            <track
-              key={subtitleVersion}
-              kind="subtitles"
-              src={`/sessions/${s.id}/subtitles/vtt?v=${subtitleVersion}`}
-              label="Subtitles"
-              default
-            />
-          )}
-        </video>
+        <div style={{ marginBottom: 14 }} onClick={() => { activeSessionId = s.id; }}>
+          <video
+            ref={videoRef}
+            src={videoUrl(s.id)}
+            controls
+            style={{ width: "100%", borderRadius: 6, maxHeight: 320, background: "#000", display: "block" }}
+          >
+            {s.capabilities.has_subtitles && (
+              <track
+                key={subtitleVersion}
+                kind="subtitles"
+                src={`/sessions/${s.id}/subtitles/vtt?v=${subtitleVersion}`}
+                label="Subtitles"
+                default
+              />
+            )}
+          </video>
+        </div>
       )}
 
       {/* Hidden SRT input — kept outside conditionals so the ref stays valid after video upload */}
@@ -323,17 +346,21 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
       {/* Subtitle editor */}
       {s.capabilities.has_subtitles && (
         <div style={{ marginBottom: 12 }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: showEditor ? 8 : 0 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: showEditor ? 8 : 0 }}>
             <button onClick={() => setShowEditor((v) => !v)}>
               {showEditor ? "Hide" : "Edit"} subtitles
             </button>
             <a href={exportSrt(s.id, rtl, buildSrtFilename(s.video_filename, s.capabilities.source_language))} download>
               <button>Download SRT</button>
             </a>
+            <button onClick={() => srtRef.current?.click()} disabled={busy}>
+              Replace SRT
+            </button>
           </div>
           {showEditor && (
             <SubtitleEditor
               sessionId={s.id}
+              version={subtitleVersion}
               onSave={() => setSubtitleVersion((v) => v + 1)}
               onSeek={(seconds) => { if (videoRef.current) videoRef.current.currentTime = seconds; }}
             />
@@ -379,6 +406,8 @@ function buildSrtFilename(videoFilename: string | null, lang: string | null): st
   const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
   return `${base}_srt_${langCode}_${ts}.srt`;
 }
+
+
 
 function statusColor(status: string) {
   if (status === "ready") return "#5c5";
