@@ -39,6 +39,7 @@ export default function ModelPicker({ open, current, onSelect, onClose }: ModelP
         zIndex: 50,
         gridColumn: "1 / -1",
         gridRow: "1 / -1",
+        animation: "modal-fade 0.15s ease",
       }}
     >
       <div
@@ -51,6 +52,7 @@ export default function ModelPicker({ open, current, onSelect, onClose }: ModelP
           borderRadius: 14,
           boxShadow: "var(--shadow-lg)",
           overflow: "hidden",
+          animation: "modal-slide 0.18s ease",
         }}
       >
         {/* Header */}

@@ -75,7 +75,7 @@ export default function CueRail({
     >
       {/* Rail header */}
       <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid var(--line-soft)", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: showFR ? 10 : 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span className="t-eyebrow">Cues</span>
           <div style={{ flex: 1 }} />
           <button
@@ -105,9 +105,15 @@ export default function CueRail({
           </button>
         </div>
 
-        {/* Find & replace bar */}
-        {showFR && (
-          <div style={{ display: "flex", gap: 6, alignItems: "center", paddingTop: 2 }}>
+        {/* Find & replace bar — height transition */}
+        <div
+          style={{
+            maxHeight: showFR ? 80 : 0,
+            overflow: "hidden",
+            transition: "max-height 0.18s ease",
+          }}
+        >
+          <div style={{ display: "flex", gap: 6, alignItems: "center", paddingTop: 8, paddingBottom: 2 }}>
             <input
               className="input"
               style={{ height: 28, fontSize: 12, flex: 1 }}
@@ -137,7 +143,7 @@ export default function CueRail({
               </span>
             )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Translate bar */}

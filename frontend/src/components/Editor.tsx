@@ -20,6 +20,7 @@ import ModelPicker from "./ModelPicker";
 import ExportSheet from "./ExportSheet";
 import VideoStage from "./VideoStage";
 import CueRail from "./CueRail";
+import WaveformStrip from "./WaveformStrip";
 import StatusDot from "./ui/StatusDot";
 import Icon from "./ui/Icon";
 import { timestampToSeconds } from "../utils/time";
@@ -39,6 +40,7 @@ interface EditorProps {
   session: Session;
   onUpdate: (s: Session) => void;
   onRemove: (id: string) => void;
+  showWaveform?: boolean;
 }
 
 const LANG_ABBREV: Record<string, string> = {
@@ -57,7 +59,7 @@ function buildSrtFilename(videoFilename: string | null, lang: string | null): st
   return `${base}_srt_${langCode}_${ts}.srt`;
 }
 
-export default function Editor({ session, onUpdate, onRemove }: EditorProps) {
+export default function Editor({ session, onUpdate, onRemove, showWaveform = false }: EditorProps) {
   const s = session;
   const busy = s.status === "queued" || s.status === "processing";
 
@@ -190,7 +192,7 @@ export default function Editor({ session, onUpdate, onRemove }: EditorProps) {
         height: "100%",
         display: "grid",
         gridTemplateColumns: "1fr 440px",
-        gridTemplateRows: "auto 1fr",
+        gridTemplateRows: showWaveform ? "auto 1fr auto" : "auto 1fr",
         overflow: "hidden",
         position: "relative",
       }}
@@ -374,6 +376,16 @@ export default function Editor({ session, onUpdate, onRemove }: EditorProps) {
           if (videoRef.current) videoRef.current.currentTime = s;
         }}
       />
+
+      {/* Waveform strip */}
+      {showWaveform && (
+        <WaveformStrip
+          sessionId={s.id}
+          currentTime={currentTime}
+          duration={duration}
+          onSeek={(t) => { if (videoRef.current) videoRef.current.currentTime = t; }}
+        />
+      )}
 
       {/* Hidden SRT input */}
       <input
