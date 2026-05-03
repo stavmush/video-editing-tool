@@ -84,6 +84,7 @@ export default function App() {
         setActiveId={setActiveId}
         view={view}
         setView={setView}
+        onBulkRemove={handleBulkRemove}
       />
       <main style={{ overflow: "hidden", position: "relative", background: "var(--bg-0)" }}>
         {loading && (
