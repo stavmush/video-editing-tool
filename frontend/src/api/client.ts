@@ -25,6 +25,14 @@ export function listSessions(): Promise<Session[]> {
   return request<Session[]>(BASE);
 }
 
+export function renameSession(id: string, name: string): Promise<Session> {
+  return request<Session>(`${BASE}/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+}
+
 export function deleteSession(id: string): Promise<void> {
   return request<void>(`${BASE}/${id}`, { method: "DELETE" });
 }

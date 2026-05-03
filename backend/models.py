@@ -24,12 +24,17 @@ StatusType = Literal["idle", "queued", "processing", "ready", "error"]
 
 class Session(BaseModel):
     id: str
+    name: Optional[str] = None
     video_filename: Optional[str] = None
     status: StatusType = "idle"
     current_job: Optional[JobType] = None
     progress: float = 0.0
     error: Optional[str] = None
     capabilities: Capabilities = Capabilities()
+
+
+class RenameRequest(BaseModel):
+    name: str
 
 
 # ── Request bodies ─────────────────────────────────────────────────────────────

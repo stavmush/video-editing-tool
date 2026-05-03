@@ -11,6 +11,7 @@ export interface Capabilities {
 
 export interface Session {
   id: string;
+  name: string | null;
   video_filename: string | null;
   status: SessionStatus;
   current_job: JobType | null;

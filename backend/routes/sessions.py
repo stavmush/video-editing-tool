@@ -4,6 +4,7 @@ import aiofiles
 from fastapi import APIRouter, HTTPException, UploadFile, File, Request
 from fastapi.responses import FileResponse, StreamingResponse
 import session_store
+from models import RenameRequest
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -170,6 +171,14 @@ async def stream_video(session_id: str, request: Request):
         )
 
     return FileResponse(video_path, media_type=media_type, headers={"Accept-Ranges": "bytes"})
+
+
+@router.patch("/{session_id}")
+async def rename_session(session_id: str, body: RenameRequest):
+    if not session_store.get_session(session_id):
+        raise HTTPException(status_code=404, detail="Session not found")
+    session_store.update_session(session_id, name=body.name.strip() or None)
+    return session_store.get_session(session_id)
 
 
 @router.delete("/{session_id}")
