@@ -40,7 +40,7 @@ export default function App() {
       <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginBottom: 28 }}>
         <h1>Video Editing Tool</h1>
         <button
-          className="primary"
+          className="btn primary"
           onClick={handleNew}
           disabled={creating}
         >
