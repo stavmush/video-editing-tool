@@ -15,6 +15,7 @@ class Capabilities(BaseModel):
     has_subtitles: bool = False
     has_denoised_video: bool = False
     source_language: Optional[str] = None
+    segment_count: Optional[int] = None
 
 
 JobType = Literal["transcribing", "translating", "denoising", "exporting"]

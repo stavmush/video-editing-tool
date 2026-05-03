@@ -75,7 +75,7 @@ async def upload_video(session_id: str, file: UploadFile = File(...), extract_su
                 for s in parsed
             ]
             session_store.update_data(session_id, segments=segments)
-            session_store.update_session(session_id, capabilities={"has_subtitles": True})
+            session_store.update_session(session_id, capabilities={"has_subtitles": True, "segment_count": len(segments)})
 
     return session_store.get_session(session_id)
 
@@ -88,8 +88,11 @@ async def upload_srt(session_id: str, file: UploadFile = File(...)):
 
     import srt as srtlib
     content = await file.read()
-    text = content.decode("utf-8")
-    parsed = list(srtlib.parse(text))
+    try:
+        text = content.decode("utf-8")
+        parsed = list(srtlib.parse(text))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Could not parse SRT file")
     if not parsed:
         raise HTTPException(status_code=400, detail="Could not parse SRT file")
 
@@ -102,7 +105,7 @@ async def upload_srt(session_id: str, file: UploadFile = File(...)):
     session_store.update_session(
         session_id,
         video_filename=file.filename,
-        capabilities={"has_subtitles": True},
+        capabilities={"has_subtitles": True, "segment_count": len(segments)},
     )
     return session_store.get_session(session_id)
 

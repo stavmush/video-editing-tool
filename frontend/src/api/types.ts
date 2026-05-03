@@ -6,6 +6,7 @@ export interface Capabilities {
   has_subtitles: boolean;
   has_denoised_video: boolean;
   source_language: string | null;
+  segment_count: number | null;
 }
 
 export interface Session {

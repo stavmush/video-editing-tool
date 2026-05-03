@@ -187,8 +187,8 @@ export default function Editor({
       const updated = await uploadSrt(s.id, file);
       onUpdate(updated);
       setSubtitleVersion((v) => v + 1);
-    } catch (err) {
-      console.error("SRT upload failed:", err);
+    } catch {
+      // SRT upload failed silently — user will see no subtitle change
     } finally {
       if (srtRef.current) srtRef.current.value = "";
     }
@@ -247,6 +247,14 @@ export default function Editor({
               <Icon name="globe" size={11} style={{ marginRight: 3, verticalAlign: "middle" }} />
               {s.capabilities.source_language ?? "—"}
             </span>
+            {s.capabilities.segment_count != null && (
+              <>
+                <span style={{ width: 1, height: 10, background: "var(--line)" }} />
+                <span className="t-mono" style={{ fontSize: 10.5 }}>
+                  {s.capabilities.segment_count} cues
+                </span>
+              </>
+            )}
             {s.capabilities.has_subtitles && (
               <>
                 <span style={{ width: 1, height: 10, background: "var(--line)" }} />
