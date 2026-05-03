@@ -248,6 +248,21 @@ html, body {
   animation: shimmer 1.6s ease-in-out infinite;
 }
 
+/* ─── Compat: unclassed buttons (editor rebuild in progress) ─── */
+button:not([class]) {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 6px 14px; height: 34px;
+  font: 500 13px/1 var(--sans);
+  color: var(--text-1);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+button:not([class]):hover   { background: var(--bg-3); }
+button:not([class]):disabled { opacity: 0.45; cursor: default; }
+
 /* ─── Utility ─────────────────────────────────────────────────── */
 .dotted {
   background-image: radial-gradient(oklch(100% 0 0 / 0.05) 1px, transparent 1px);

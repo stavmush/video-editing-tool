@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Session } from "../api/types";
 import {
-  deleteSession,
   getSession,
   openProgressStream,
   transcribe,
@@ -163,7 +162,6 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
 
   function handleDelete() {
     onRemove(s.id);
-    deleteSession(s.id).catch(() => {});
   }
 
   return (
@@ -284,7 +282,7 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
           <select value={model} onChange={(e) => setModel(e.target.value)}>
             {MODEL_OPTIONS.map((m) => <option key={m}>{m}</option>)}
           </select>
-          <button onClick={handleTranscribe} disabled={busy} className="primary">
+          <button onClick={handleTranscribe} disabled={busy} className="btn primary">
             Transcribe
           </button>
         </div>
@@ -379,7 +377,7 @@ export default function SessionPanel({ session, onUpdate, onRemove }: Props) {
             <input type="checkbox" checked={rtl} onChange={(e) => setRtl(e.target.checked)} />
             RTL
           </label>
-          <button onClick={handleExport} disabled={busy} className="primary">
+          <button onClick={handleExport} disabled={busy} className="btn primary">
             Export video
           </button>
           <a href={downloadExportUrl(s.id)} download="output.mp4">
