@@ -436,7 +436,7 @@ function DeleteConfirmModal({
         <p style={{ fontSize: 13, color: "var(--text-3)", margin: "0 0 16px" }}>
           This will permanently remove the following sessions and all associated files.
         </p>
-        <ul style={{ margin: "0 0 20px", padding: "0 0 0 16px", fontSize: 13, color: "var(--text-2)", display: "flex", flexDirection: "column", gap: 4 }}>
+        <ul style={{ margin: "0 0 20px", padding: "0 0 0 16px", fontSize: 13, color: "var(--text-2)", display: "flex", flexDirection: "column", gap: 4, maxHeight: 240, overflowY: "auto" }}>
           {sessions.map((s) => (
             <li key={s.id}>{s.name ?? s.video_filename ?? s.id}</li>
           ))}
