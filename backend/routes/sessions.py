@@ -75,7 +75,7 @@ async def upload_video(session_id: str, file: UploadFile = File(...), extract_su
                 for s in parsed
             ]
             session_store.update_data(session_id, segments=segments)
-            session_store.update_session(session_id, capabilities={"has_subtitles": True})
+            session_store.update_session(session_id, capabilities={"has_subtitles": True, "segment_count": len(segments)})
 
     return session_store.get_session(session_id)
 
@@ -102,7 +102,7 @@ async def upload_srt(session_id: str, file: UploadFile = File(...)):
     session_store.update_session(
         session_id,
         video_filename=file.filename,
-        capabilities={"has_subtitles": True},
+        capabilities={"has_subtitles": True, "segment_count": len(segments)},
     )
     return session_store.get_session(session_id)
 

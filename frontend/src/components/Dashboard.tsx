@@ -150,6 +150,14 @@ function SessionCard({
               <span style={{ color: "var(--text-3)" }}>{s.capabilities.source_language}</span>
             </>
           )}
+          {s.capabilities.segment_count != null && (
+            <>
+              <span style={{ width: 1, height: 10, background: "var(--line)" }} />
+              <span className="t-mono" style={{ color: "var(--text-4)", fontSize: 10.5 }}>
+                {s.capabilities.segment_count} cues
+              </span>
+            </>
+          )}
         </div>
 
         {(s.status === "processing" || s.status === "queued") && (

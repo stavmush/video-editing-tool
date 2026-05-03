@@ -91,7 +91,7 @@ async def transcribe(session_id: str, body: TranscribeRequest):
                 status="ready",
                 current_job=None,
                 progress=1.0,
-                capabilities={"has_subtitles": True, "source_language": detected_lang},
+                capabilities={"has_subtitles": True, "source_language": detected_lang, "segment_count": len(segments)},
             )
             await _push(session_id, "done", 1.0, "Transcription complete")
         except Exception as e:
@@ -153,7 +153,13 @@ async def translate(session_id: str, body: TranslateRequest):
                 )
 
             session_store.update_data(session_id, segments=translated)
-            session_store.update_session(session_id, status="ready", current_job=None, progress=1.0)
+            session_store.update_session(
+                session_id,
+                status="ready",
+                current_job=None,
+                progress=1.0,
+                capabilities={"segment_count": len(translated)},
+            )
             await _push(session_id, "done", 1.0, "Translation complete")
         except Exception as e:
             session_store.update_session(session_id, status="error", current_job=None, error=str(e))

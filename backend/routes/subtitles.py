@@ -34,5 +34,5 @@ async def save_subtitles(session_id: str, segments: list[Segment]):
         raise HTTPException(status_code=404, detail="Session not found")
     raw = [{"id": s.id, "start": s.start, "end": s.end, "text": s.text} for s in segments]
     session_store.update_data(session_id, segments=raw)
-    session_store.update_session(session_id, capabilities={"has_subtitles": True})
+    session_store.update_session(session_id, capabilities={"has_subtitles": True, "segment_count": len(raw)})
     return {"ok": True, "count": len(raw)}
