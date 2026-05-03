@@ -230,6 +230,69 @@ def transcribe_video(
     return _transcribe_chunked(video_path, "transcribe", model_size, on_progress)
 
 
+def transcribe_via_groq(
+    video_path: str,
+    on_progress: ProgressFn | None = None,
+) -> tuple[list[Segment], str]:
+    """Transcribe video audio using Groq's hosted Whisper large-v3 API.
+
+    Splits audio into ≤10-minute chunks (≈18 MB each) to stay under Groq's
+    25 MB per-request limit. Requires GROQ_API_KEY env var.
+    """
+    import groq as groq_sdk
+
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY environment variable is not set")
+
+    client = groq_sdk.Groq(api_key=api_key)
+    total = _get_duration(video_path)
+
+    all_segments: list[Segment] = []
+    detected_lang = "unknown"
+    seg_id = 1
+    chunk_start = 0.0
+
+    while chunk_start < total:
+        chunk_dur = min(_CHUNK_SECONDS, total - chunk_start)
+        audio_path = _extract_audio_chunk(video_path, chunk_start, chunk_dur)
+        try:
+            if on_progress:
+                pct = chunk_start / total
+                on_progress(pct, f"Transcribing via Groq… {int(pct * 100)}%")
+
+            with open(audio_path, "rb") as f:
+                response = client.audio.transcriptions.create(
+                    model="whisper-large-v3",
+                    file=("chunk.wav", f, "audio/wav"),
+                    response_format="verbose_json",
+                    timestamp_granularities=["segment"],
+                )
+
+            if chunk_start == 0 and hasattr(response, "language"):
+                detected_lang = response.language or "unknown"
+
+            for seg in (response.segments or []):
+                text = seg.text.strip() if hasattr(seg, "text") else ""
+                if text:
+                    all_segments.append({
+                        "id":    seg_id,
+                        "start": float(seg.start) + chunk_start,
+                        "end":   float(seg.end) + chunk_start,
+                        "text":  text,
+                    })
+                    seg_id += 1
+        finally:
+            os.unlink(audio_path)
+
+        chunk_start += chunk_dur
+
+    if on_progress:
+        on_progress(1.0, "Transcription complete")
+
+    return all_segments, detected_lang
+
+
 def transcribe_to_english(
     video_path: str,
     model_size: str,

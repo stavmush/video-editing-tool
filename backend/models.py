@@ -40,7 +40,7 @@ class RenameRequest(BaseModel):
 # ── Request bodies ─────────────────────────────────────────────────────────────
 
 class TranscribeRequest(BaseModel):
-    model_size: Literal["tiny", "base", "small", "medium", "large-v2", "large-v3"] = "small"
+    model_size: Literal["tiny", "base", "small", "medium", "large-v2", "large-v3", "groq-whisper-large-v3"] = "small"
     source_language: Optional[str] = None  # None = auto-detect
 
 

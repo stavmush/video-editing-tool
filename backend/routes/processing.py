@@ -70,21 +70,32 @@ async def transcribe(session_id: str, body: TranscribeRequest):
             )
 
         try:
-            from utils.transcribe import transcribe_video, is_model_cached
-            if not is_model_cached(body.model_size):
-                on_progress(0.0, "Downloading model… (first time only)")
-            else:
-                on_progress(0.0, "Loading model…")
             print(f"[transcribe] starting job for session {session_id}, model={body.model_size}")
             loop = asyncio.get_event_loop()
-            segments, detected_lang = await loop.run_in_executor(
-                None,
-                lambda: transcribe_video(
-                    video_path=data["video_path"],
-                    model_size=body.model_size,
-                    on_progress=on_progress,
-                ),
-            )
+            if body.model_size.startswith("groq-"):
+                from utils.transcribe import transcribe_via_groq
+                on_progress(0.0, "Connecting to Groq…")
+                segments, detected_lang = await loop.run_in_executor(
+                    None,
+                    lambda: transcribe_via_groq(
+                        video_path=data["video_path"],
+                        on_progress=on_progress,
+                    ),
+                )
+            else:
+                from utils.transcribe import transcribe_video, is_model_cached
+                if not is_model_cached(body.model_size):
+                    on_progress(0.0, "Downloading model… (first time only)")
+                else:
+                    on_progress(0.0, "Loading model…")
+                segments, detected_lang = await loop.run_in_executor(
+                    None,
+                    lambda: transcribe_video(
+                        video_path=data["video_path"],
+                        model_size=body.model_size,
+                        on_progress=on_progress,
+                    ),
+                )
             session_store.update_data(session_id, segments=segments)
             session_store.update_session(
                 session_id,
