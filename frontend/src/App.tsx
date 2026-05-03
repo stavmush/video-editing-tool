@@ -6,7 +6,7 @@ import Topbar from "./components/Topbar";
 import Sidebar from "./components/Sidebar";
 import Dashboard from "./components/Dashboard";
 import UploadFlow from "./components/UploadFlow";
-import SessionPanel from "./components/SessionPanel";
+import Editor from "./components/Editor";
 
 export default function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -86,13 +86,11 @@ export default function App() {
         )}
 
         {view === "editor" && activeSession && (
-          <div style={{ height: "100%", overflow: "auto", padding: 24 }}>
-            <SessionPanel
-              session={activeSession}
-              onUpdate={handleUpdate}
-              onRemove={handleRemove}
-            />
-          </div>
+          <Editor
+            session={activeSession}
+            onUpdate={handleUpdate}
+            onRemove={handleRemove}
+          />
         )}
 
         {view === "editor" && !activeSession && !loading && (
