@@ -24,6 +24,7 @@ import WaveformStrip from "./WaveformStrip";
 import StatusDot from "./ui/StatusDot";
 import Icon from "./ui/Icon";
 import { timestampToSeconds } from "../utils/time";
+import type { SubtitleView } from "./TweaksPanel";
 
 const LANG_OPTIONS = [
   { code: "auto", label: "Auto-detect" },
@@ -41,6 +42,8 @@ interface EditorProps {
   onUpdate: (s: Session) => void;
   onRemove: (id: string) => void;
   showWaveform?: boolean;
+  subtitleView?: SubtitleView;
+  showAI?: boolean;
 }
 
 const LANG_ABBREV: Record<string, string> = {
@@ -59,7 +62,14 @@ function buildSrtFilename(videoFilename: string | null, lang: string | null): st
   return `${base}_srt_${langCode}_${ts}.srt`;
 }
 
-export default function Editor({ session, onUpdate, onRemove, showWaveform = false }: EditorProps) {
+export default function Editor({
+  session,
+  onUpdate,
+  onRemove,
+  showWaveform = false,
+  subtitleView = "grid",
+  showAI = false,
+}: EditorProps) {
   const s = session;
   const busy = s.status === "queued" || s.status === "processing";
 
@@ -191,7 +201,7 @@ export default function Editor({ session, onUpdate, onRemove, showWaveform = fal
       style={{
         height: "100%",
         display: "grid",
-        gridTemplateColumns: "1fr 440px",
+        gridTemplateColumns: subtitleView === "twopane" ? "1fr 360px" : "1fr 440px",
         gridTemplateRows: showWaveform ? "auto 1fr auto" : "auto 1fr",
         overflow: "hidden",
         position: "relative",
@@ -362,6 +372,7 @@ export default function Editor({ session, onUpdate, onRemove, showWaveform = fal
       {/* Cue rail */}
       <CueRail
         session={s}
+        segments={segments}
         subtitleVersion={subtitleVersion}
         onSave={() => setSubtitleVersion((v) => v + 1)}
         srcLang={srcLang}
@@ -372,9 +383,11 @@ export default function Editor({ session, onUpdate, onRemove, showWaveform = fal
         srtRef={srtRef}
         busy={busy}
         currentTimeSeconds={currentTime}
-        onSeek={(s) => {
-          if (videoRef.current) videoRef.current.currentTime = s;
+        onSeek={(t) => {
+          if (videoRef.current) videoRef.current.currentTime = t;
         }}
+        subtitleView={subtitleView}
+        showAI={showAI}
       />
 
       {/* Waveform strip */}

@@ -1,8 +1,12 @@
 import { useRef, useState } from "react";
 import type { RefObject } from "react";
 import type { Session } from "../api/types";
+import type { Segment } from "../api/types";
 import type { SubtitleEditorHandle } from "./SubtitleEditor";
+import type { SubtitleView } from "./TweaksPanel";
 import SubtitleEditor from "./SubtitleEditor";
+import CueList from "./CueList";
+import CueTimeline from "./CueTimeline";
 import Icon from "./ui/Icon";
 
 const LANG_OPTIONS = [
@@ -16,8 +20,15 @@ const LANG_OPTIONS = [
   { code: "ru",   label: "Russian" },
 ];
 
+const AI_SUGGESTIONS = [
+  "Consider splitting this long cue at the natural pause.",
+  'Possible spelling: "their" instead of "there".',
+  "This cue overlaps the next by 80 ms — adjust timing?",
+];
+
 interface CueRailProps {
   session: Session;
+  segments: Segment[];
   subtitleVersion: number;
   onSave: () => void;
   srcLang: string;
@@ -29,10 +40,13 @@ interface CueRailProps {
   busy: boolean;
   currentTimeSeconds: number;
   onSeek: (s: number) => void;
+  subtitleView: SubtitleView;
+  showAI: boolean;
 }
 
 export default function CueRail({
   session: s,
+  segments,
   subtitleVersion,
   onSave,
   srcLang,
@@ -44,12 +58,16 @@ export default function CueRail({
   busy,
   currentTimeSeconds,
   onSeek,
+  subtitleView,
+  showAI,
 }: CueRailProps) {
   const editorRef = useRef<SubtitleEditorHandle>(null);
   const [showFR, setShowFR] = useState(false);
   const [findText, setFindText] = useState("");
   const [replaceText, setReplaceText] = useState("");
   const [replaceMsg, setReplaceMsg] = useState<string | null>(null);
+  const [aiIdx, setAiIdx] = useState(0);
+  const [aiDismissed, setAiDismissed] = useState(false);
 
   function handleReplaceAll() {
     const count = editorRef.current?.replaceAll(findText, replaceText) ?? 0;
@@ -61,6 +79,8 @@ export default function CueRail({
     await editorRef.current?.save();
     onSave();
   }
+
+  const useGrid = subtitleView === "grid" || subtitleView === "twopane";
 
   return (
     <aside
@@ -77,73 +97,84 @@ export default function CueRail({
       <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid var(--line-soft)", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span className="t-eyebrow">Cues</span>
+          {segments.length > 0 && (
+            <span className="pill" style={{ fontSize: 9, padding: "2px 6px" }}>
+              {segments.length}
+            </span>
+          )}
           <div style={{ flex: 1 }} />
-          <button
-            className="btn sm ghost icon"
-            title="Find & replace"
-            onClick={() => setShowFR((v) => !v)}
-            style={{ background: showFR ? "var(--bg-2)" : undefined }}
-          >
-            <Icon name="search" size={13} />
-          </button>
-          <button
-            className="btn sm ghost icon"
-            title="Insert cue"
-            onClick={() => editorRef.current?.insertRowAfter()}
-          >
-            <Icon name="plus" size={13} />
-          </button>
-          <button
-            className="btn sm ghost icon"
-            title="Delete selected"
-            onClick={() => editorRef.current?.deleteSelected()}
-          >
-            <Icon name="trash" size={13} />
-          </button>
-          <button className="btn sm primary" onClick={handleSave} disabled={busy}>
-            <Icon name="save" size={12} /> Save
-          </button>
+          {useGrid && (
+            <>
+              <button
+                className="btn sm ghost icon"
+                title="Find & replace"
+                onClick={() => setShowFR((v) => !v)}
+                style={{ background: showFR ? "var(--bg-2)" : undefined }}
+              >
+                <Icon name="search" size={13} />
+              </button>
+              <button
+                className="btn sm ghost icon"
+                title="Insert cue"
+                onClick={() => editorRef.current?.insertRowAfter()}
+              >
+                <Icon name="plus" size={13} />
+              </button>
+              <button
+                className="btn sm ghost icon"
+                title="Delete selected"
+                onClick={() => editorRef.current?.deleteSelected()}
+              >
+                <Icon name="trash" size={13} />
+              </button>
+              <button className="btn sm primary" onClick={handleSave} disabled={busy}>
+                <Icon name="save" size={12} /> Save
+              </button>
+            </>
+          )}
         </div>
 
         {/* Find & replace bar — height transition */}
-        <div
-          style={{
-            maxHeight: showFR ? 80 : 0,
-            overflow: "hidden",
-            transition: "max-height 0.18s ease",
-          }}
-        >
-          <div style={{ display: "flex", gap: 6, alignItems: "center", paddingTop: 8, paddingBottom: 2 }}>
-            <input
-              className="input"
-              style={{ height: 28, fontSize: 12, flex: 1 }}
-              placeholder="Find…"
-              value={findText}
-              onChange={(e) => setFindText(e.target.value)}
-              dir="auto"
-            />
-            <input
-              className="input"
-              style={{ height: 28, fontSize: 12, flex: 1 }}
-              placeholder="Replace…"
-              value={replaceText}
-              onChange={(e) => setReplaceText(e.target.value)}
-              dir="auto"
-            />
-            <button
-              className="btn sm"
-              onClick={handleReplaceAll}
-              disabled={!findText}
-            >
-              All
-            </button>
-            {replaceMsg && (
-              <span style={{ fontSize: 11, color: "var(--text-3)", whiteSpace: "nowrap" }}>
-                {replaceMsg}
-              </span>
-            )}
+        {useGrid && (
+          <div
+            style={{
+              maxHeight: showFR ? 80 : 0,
+              overflow: "hidden",
+              transition: "max-height 0.18s ease",
+            }}
+          >
+            <div style={{ display: "flex", gap: 6, alignItems: "center", paddingTop: 8, paddingBottom: 2 }}>
+              <input
+                className="input"
+                style={{ height: 28, fontSize: 12, flex: 1 }}
+                placeholder="Find…"
+                value={findText}
+                onChange={(e) => setFindText(e.target.value)}
+                dir="auto"
+              />
+              <input
+                className="input"
+                style={{ height: 28, fontSize: 12, flex: 1 }}
+                placeholder="Replace…"
+                value={replaceText}
+                onChange={(e) => setReplaceText(e.target.value)}
+                dir="auto"
+              />
+              <button
+                className="btn sm"
+                onClick={handleReplaceAll}
+                disabled={!findText}
+              >
+                All
+              </button>
+              {replaceMsg && (
+                <span style={{ fontSize: 11, color: "var(--text-3)", whiteSpace: "nowrap" }}>
+                  {replaceMsg}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Translate bar */}
@@ -185,7 +216,7 @@ export default function CueRail({
         </div>
       )}
 
-      {/* SRT upload prompt (video uploaded, no subtitles yet) */}
+      {/* SRT upload prompt */}
       {s.capabilities.has_video && !s.capabilities.has_subtitles && (
         <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--line-soft)", flexShrink: 0 }}>
           <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--text-2)" }}>
@@ -201,16 +232,72 @@ export default function CueRail({
         </div>
       )}
 
-      {/* Subtitle grid */}
+      {/* View body */}
       {s.capabilities.has_subtitles && (
-        <SubtitleEditor
-          ref={editorRef}
-          sessionId={s.id}
-          version={subtitleVersion}
-          onSave={onSave}
-          onSeek={onSeek}
-          currentTimeSeconds={currentTimeSeconds}
-        />
+        <>
+          {subtitleView === "timeline" ? (
+            <CueTimeline
+              segments={segments}
+              currentTimeSeconds={currentTimeSeconds}
+              onSeek={onSeek}
+            />
+          ) : subtitleView === "list" ? (
+            <CueList
+              segments={segments}
+              currentTimeSeconds={currentTimeSeconds}
+              onSeek={onSeek}
+            />
+          ) : (
+            /* grid or twopane — use SubtitleEditor (editable) */
+            <SubtitleEditor
+              ref={editorRef}
+              sessionId={s.id}
+              version={subtitleVersion}
+              onSave={onSave}
+              onSeek={onSeek}
+              currentTimeSeconds={currentTimeSeconds}
+            />
+          )}
+        </>
+      )}
+
+      {/* AI suggestions footer */}
+      {showAI && s.capabilities.has_subtitles && !aiDismissed && (
+        <div
+          style={{
+            borderTop: "1px solid var(--accent-line)",
+            background: "var(--accent-soft)",
+            padding: "10px 14px",
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <Icon name="sparkles" size={13} style={{ color: "var(--accent)" }} />
+            <span style={{ fontSize: 11.5, fontWeight: 500, color: "var(--accent-hi)" }}>
+              AI suggestion
+            </span>
+            <span className="pill accent" style={{ fontSize: 9, padding: "2px 6px" }}>BETA</span>
+          </div>
+          <p style={{ margin: "0 0 8px", fontSize: 12, color: "var(--text-2)", lineHeight: 1.4 }}>
+            {AI_SUGGESTIONS[aiIdx % AI_SUGGESTIONS.length]}
+          </p>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              className="btn sm primary"
+              style={{ fontSize: 11 }}
+              onClick={() => setAiIdx((i) => i + 1)}
+            >
+              Next
+            </button>
+            <button
+              className="btn sm ghost"
+              style={{ fontSize: 11 }}
+              onClick={() => setAiDismissed(true)}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Replace SRT button at bottom */}

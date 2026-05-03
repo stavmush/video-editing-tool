@@ -8,6 +8,7 @@ import Dashboard from "./components/Dashboard";
 import UploadFlow from "./components/UploadFlow";
 import Editor from "./components/Editor";
 import TweaksPanel from "./components/TweaksPanel";
+import type { SubtitleView } from "./components/TweaksPanel";
 
 export default function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -16,6 +17,8 @@ export default function App() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [showWaveform, setShowWaveform] = useState(false);
+  const [subtitleView, setSubtitleView] = useState<SubtitleView>("grid");
+  const [showAI, setShowAI] = useState(false);
 
   useEffect(() => {
     listSessions()
@@ -95,6 +98,8 @@ export default function App() {
             onUpdate={handleUpdate}
             onRemove={handleRemove}
             showWaveform={showWaveform}
+            subtitleView={subtitleView}
+            showAI={showAI}
           />
         )}
 
@@ -110,8 +115,12 @@ export default function App() {
       <TweaksPanel
         theme={theme}
         setTheme={setTheme}
+        subtitleView={subtitleView}
+        setSubtitleView={setSubtitleView}
         showWaveform={showWaveform}
         setShowWaveform={setShowWaveform}
+        showAI={showAI}
+        setShowAI={setShowAI}
       />
     </div>
   );
