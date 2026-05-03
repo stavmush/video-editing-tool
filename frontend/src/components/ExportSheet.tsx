@@ -42,6 +42,7 @@ export default function ExportSheet({
         zIndex: 50,
         gridColumn: "1 / -1",
         gridRow: "1 / -1",
+        animation: "modal-fade 0.15s ease",
       }}
     >
       <div
@@ -53,6 +54,7 @@ export default function ExportSheet({
           borderRadius: 14,
           padding: 24,
           boxShadow: "var(--shadow-lg)",
+          animation: "modal-slide 0.18s ease",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", marginBottom: 18 }}>

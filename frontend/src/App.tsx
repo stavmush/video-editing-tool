@@ -7,12 +7,15 @@ import Sidebar from "./components/Sidebar";
 import Dashboard from "./components/Dashboard";
 import UploadFlow from "./components/UploadFlow";
 import Editor from "./components/Editor";
+import TweaksPanel from "./components/TweaksPanel";
 
 export default function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("dashboard");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [showWaveform, setShowWaveform] = useState(false);
 
   useEffect(() => {
     listSessions()
@@ -43,6 +46,7 @@ export default function App() {
 
   return (
     <div
+      className={theme === "light" ? "theme-light" : undefined}
       style={{
         display: "grid",
         gridTemplateColumns: "240px 1fr",
@@ -90,6 +94,7 @@ export default function App() {
             session={activeSession}
             onUpdate={handleUpdate}
             onRemove={handleRemove}
+            showWaveform={showWaveform}
           />
         )}
 
@@ -102,6 +107,12 @@ export default function App() {
           </div>
         )}
       </main>
+      <TweaksPanel
+        theme={theme}
+        setTheme={setTheme}
+        showWaveform={showWaveform}
+        setShowWaveform={setShowWaveform}
+      />
     </div>
   );
 }
