@@ -88,8 +88,11 @@ async def upload_srt(session_id: str, file: UploadFile = File(...)):
 
     import srt as srtlib
     content = await file.read()
-    text = content.decode("utf-8")
-    parsed = list(srtlib.parse(text))
+    try:
+        text = content.decode("utf-8")
+        parsed = list(srtlib.parse(text))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Could not parse SRT file")
     if not parsed:
         raise HTTPException(status_code=400, detail="Could not parse SRT file")
 
