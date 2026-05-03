@@ -1,12 +1,21 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, GridApi, CellEditingStoppedEvent } from "ag-grid-community";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 import { getSubtitles, saveSubtitles } from "../api/client";
 import type { Segment } from "../api/types";
+import { timestampToSeconds } from "../utils/time";
 
-/** RTL-aware textarea editor — sets dir="auto" so Hebrew types right-to-left */
+/** RTL-aware textarea editor — dir="auto" so Hebrew types right-to-left */
 const RtlTextareaEditor = forwardRef(function RtlTextareaEditor(
   props: { value: string },
   ref: React.Ref<unknown>,
@@ -35,33 +44,42 @@ const RtlTextareaEditor = forwardRef(function RtlTextareaEditor(
         minHeight: 72,
         border: "none",
         outline: "none",
-        background: "#2a2d3e",
-        color: "#e0e0e0",
+        background: "var(--bg-2)",
+        color: "var(--text-1)",
         fontSize: 13,
         padding: "6px 8px",
         resize: "vertical",
         boxSizing: "border-box",
-        fontFamily: "inherit",
+        fontFamily: "var(--sans)",
         lineHeight: 1.5,
       }}
     />
   );
 });
 
+export interface SubtitleEditorHandle {
+  replaceAll: (find: string, replace: string) => number;
+  insertRowAfter: () => void;
+  deleteSelected: () => void;
+  save: () => Promise<void>;
+}
+
 interface Props {
   sessionId: string;
   version?: number;
   onSave?: () => void;
   onSeek?: (seconds: number) => void;
+  currentTimeSeconds?: number;
 }
 
-
-export default function SubtitleEditor({ sessionId, version, onSave, onSeek }: Props) {
+export default forwardRef<SubtitleEditorHandle, Props>(function SubtitleEditor(
+  { sessionId, version, onSave, onSeek, currentTimeSeconds },
+  ref,
+) {
   const [rows, setRows] = useState<Segment[]>([]);
   const rowsRef = useRef<Segment[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const gridRef = useRef<GridApi | null>(null);
 
   useEffect(() => {
@@ -73,9 +91,9 @@ export default function SubtitleEditor({ sessionId, version, onSave, onSeek }: P
 
   const columnDefs = useMemo<ColDef<Segment>[]>(
     () => [
-      { field: "id", headerName: "#", width: 60, editable: false },
-      { field: "start", headerName: "Start", width: 130 },
-      { field: "end", headerName: "End", width: 130 },
+      { field: "id",    headerName: "#",     width: 52,  editable: false },
+      { field: "start", headerName: "Start", width: 122 },
+      { field: "end",   headerName: "End",   width: 122 },
       {
         field: "text",
         headerName: "Text",
@@ -84,7 +102,17 @@ export default function SubtitleEditor({ sessionId, version, onSave, onSeek }: P
         autoHeight: true,
         cellEditor: RtlTextareaEditor,
         cellRenderer: (params: { value: string }) => (
-          <span dir="auto" style={{ width: "100%", display: "block", whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: 1.5, padding: "4px 0" }}>
+          <span
+            dir="auto"
+            style={{
+              width: "100%",
+              display: "block",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              lineHeight: 1.5,
+              padding: "4px 0",
+            }}
+          >
             {params.value ?? ""}
           </span>
         ),
@@ -103,158 +131,122 @@ export default function SubtitleEditor({ sessionId, version, onSave, onSeek }: P
     [],
   );
 
-  async function save() {
-    setSaving(true);
-    try {
-      await saveSubtitles(sessionId, rowsRef.current);
-      setSaved(true);
-      onSave?.();
-      setTimeout(() => setSaved(false), 2000);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function resequence(rows: Segment[]): Segment[] {
-    return rows.map((r, i) => ({ ...r, id: i + 1 }));
-  }
-
-  function insertRowAfter() {
-    const selected = gridRef.current?.getSelectedRows() as Segment[] | undefined;
-    const current = rowsRef.current;
-    const afterId = selected?.[0]?.id ?? current[current.length - 1]?.id ?? 0;
-    const idx = current.findIndex((r) => r.id === afterId);
-    const prev = current[idx];
-    const next = current[idx + 1];
-    const newRow: Segment = {
-      id: 0,
-      start: prev?.end ?? "00:00:00,000",
-      end: next?.start ?? bumpTime(prev?.end ?? "00:00:00,000", 2),
-      text: "",
-    };
-    const resequenced = resequence([...current.slice(0, idx + 1), newRow, ...current.slice(idx + 1)]);
-    rowsRef.current = resequenced;
-    setRows(resequenced);
-  }
-
-  function insertSpeakerRow() {
-    const selected = gridRef.current?.getSelectedRows() as Segment[] | undefined;
-    const current = rowsRef.current;
-    if (!selected?.length) return;
-    const afterId = selected[0].id;
-    const idx = current.findIndex((r) => r.id === afterId);
-    const prev = current[idx];
-    const newRow: Segment = {
-      id: 0,
-      start: prev.start,
-      end: prev.end,
-      text: "",
-    };
-    const resequenced = resequence([...current.slice(0, idx + 1), newRow, ...current.slice(idx + 1)]);
-    rowsRef.current = resequenced;
-    setRows(resequenced);
-  }
-
-  function deleteSelected() {
-    const selected = gridRef.current?.getSelectedRows() as Segment[] | undefined;
-    if (!selected?.length) return;
-    const ids = new Set(selected.map((r) => r.id));
-    const resequenced = resequence(rowsRef.current.filter((r) => !ids.has(r.id)));
-    rowsRef.current = resequenced;
-    setRows(resequenced);
-  }
-
-  const [showReplace, setShowReplace] = useState(false);
-  const [findText, setFindText] = useState("");
-  const [replaceText, setReplaceText] = useState("");
-  const [replaceCount, setReplaceCount] = useState<number | null>(null);
-
-  function replaceAll() {
-    if (!findText) return;
-    let count = 0;
-    const updated = rowsRef.current.map((r) => {
-      if (!r.text.includes(findText)) return r;
-      count++;
-      return { ...r, text: r.text.split(findText).join(replaceText) };
+  // Highlight the active row based on video currentTime
+  useEffect(() => {
+    if (currentTimeSeconds === undefined || !gridRef.current) return;
+    const active = rowsRef.current.find((r) => {
+      const s = timestampToSeconds(r.start);
+      const e = timestampToSeconds(r.end);
+      return currentTimeSeconds >= s && currentTimeSeconds < e;
     });
-    rowsRef.current = updated;
-    setRows(updated);
-    setReplaceCount(count);
-    setTimeout(() => setReplaceCount(null), 2500);
-  }
+    if (active) {
+      gridRef.current.ensureNodeVisible(
+        gridRef.current.getRowNode(String(active.id)),
+        "middle",
+      );
+    }
+  }, [currentTimeSeconds]);
 
-  if (loading) return <p style={{ color: "#aaa", marginTop: 8 }}>Loading subtitles…</p>;
+  useImperativeHandle(ref, () => ({
+    replaceAll(find: string, replace: string): number {
+      if (!find) return 0;
+      let count = 0;
+      const updated = rowsRef.current.map((r) => {
+        if (!r.text.includes(find)) return r;
+        count++;
+        return { ...r, text: r.text.split(find).join(replace) };
+      });
+      rowsRef.current = updated;
+      setRows(updated);
+      return count;
+    },
+    insertRowAfter() {
+      const selected = gridRef.current?.getSelectedRows() as Segment[] | undefined;
+      const current = rowsRef.current;
+      const afterId = selected?.[0]?.id ?? current[current.length - 1]?.id ?? 0;
+      const idx = current.findIndex((r) => r.id === afterId);
+      const prev = current[idx];
+      const next = current[idx + 1];
+      const newRow: Segment = {
+        id: 0,
+        start: prev?.end ?? "00:00:00,000",
+        end: next?.start ?? bumpTime(prev?.end ?? "00:00:00,000", 2),
+        text: "",
+      };
+      const resequenced = resequence([
+        ...current.slice(0, idx + 1),
+        newRow,
+        ...current.slice(idx + 1),
+      ]);
+      rowsRef.current = resequenced;
+      setRows(resequenced);
+    },
+    deleteSelected() {
+      const selected = gridRef.current?.getSelectedRows() as Segment[] | undefined;
+      if (!selected?.length) return;
+      const ids = new Set(selected.map((r) => r.id));
+      const resequenced = resequence(rowsRef.current.filter((r) => !ids.has(r.id)));
+      rowsRef.current = resequenced;
+      setRows(resequenced);
+    },
+    async save() {
+      setSaving(true);
+      try {
+        await saveSubtitles(sessionId, rowsRef.current);
+        onSave?.();
+      } finally {
+        setSaving(false);
+      }
+    },
+  }));
+
+  if (loading) {
+    return (
+      <div style={{ padding: 16, color: "var(--text-3)", fontSize: 13 }}>
+        Loading subtitles…
+      </div>
+    );
+  }
 
   return (
-    <div style={{ marginTop: 12 }}>
-      <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-        <button onClick={insertRowAfter}>+ Insert row</button>
-        <button onClick={insertSpeakerRow} title="Insert a new row with the same timestamps (for multiple speakers)">+ Add speaker</button>
-        <button onClick={deleteSelected} style={{ color: "#e55", borderColor: "#e55" }}>
-          Delete selected
-        </button>
-        <button onClick={() => { setShowReplace((v) => !v); setReplaceCount(null); }}>
-          {showReplace ? "Hide replace" : "Find & replace"}
-        </button>
-        <button onClick={save} disabled={saving} className="primary">
-          {saving ? "Saving…" : saved ? "Saved!" : "Save"}
-        </button>
-      </div>
-      {showReplace && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
-          <input
-            placeholder="Find…"
-            value={findText}
-            onChange={(e) => setFindText(e.target.value)}
-            dir="auto"
-            style={{ padding: "4px 8px", background: "#1e2130", border: "1px solid #444", borderRadius: 4, color: "#e0e0e0", fontSize: 13, minWidth: 160 }}
-          />
-          <input
-            placeholder="Replace with…"
-            value={replaceText}
-            onChange={(e) => setReplaceText(e.target.value)}
-            dir="auto"
-            style={{ padding: "4px 8px", background: "#1e2130", border: "1px solid #444", borderRadius: 4, color: "#e0e0e0", fontSize: 13, minWidth: 160 }}
-          />
-          <button onClick={replaceAll} disabled={!findText}>Replace all</button>
-          {replaceCount !== null && (
-            <span style={{ color: replaceCount > 0 ? "#5c5" : "#aaa", fontSize: 13 }}>
-              {replaceCount > 0 ? `Replaced in ${replaceCount} row${replaceCount > 1 ? "s" : ""}` : "No matches"}
-            </span>
-          )}
+    <div
+      className="ag-theme-alpine-dark ag-editor"
+      style={{ flex: 1, minHeight: 0 }}
+    >
+      <AgGridReact<Segment>
+        rowData={rows}
+        columnDefs={columnDefs}
+        getRowId={(p) => String(p.data.id)}
+        onGridReady={(p) => { gridRef.current = p.api; }}
+        onCellEditingStopped={onCellEditingStopped}
+        onRowClicked={(e) => { if (e.data && onSeek) onSeek(timestampToSeconds(e.data.start)); }}
+        rowSelection="multiple"
+        defaultColDef={{ editable: true, resizable: true }}
+        stopEditingWhenCellsLoseFocus
+        enableCellEditingOnBackspace
+      />
+      {saving && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 8,
+            right: 12,
+            fontSize: 11,
+            color: "var(--text-3)",
+          }}
+        >
+          Saving…
         </div>
       )}
-
-      <div
-        className="ag-theme-alpine-dark"
-        style={{ height: 400, width: "100%" }}
-      >
-        <AgGridReact<Segment>
-          rowData={rows}
-          columnDefs={columnDefs}
-          getRowId={(p) => String(p.data.id)}
-          onGridReady={(p) => { gridRef.current = p.api; }}
-          onCellEditingStopped={onCellEditingStopped}
-          onRowClicked={(e) => { if (e.data && onSeek) onSeek(timestampToSeconds(e.data.start)); }}
-          rowSelection="multiple"
-          defaultColDef={{ editable: true, resizable: true }}
-          stopEditingWhenCellsLoseFocus
-          enableCellEditingOnBackspace
-        />
-      </div>
     </div>
   );
-}
+});
 
-function timestampToSeconds(ts: string | number): number {
-  if (typeof ts === "number") return ts;
-  const [hms, ms = "0"] = ts.split(",");
-  const [h, m, s] = hms.split(":").map(Number);
-  return h * 3600 + m * 60 + s + parseInt(ms, 10) / 1000;
+function resequence(rows: Segment[]): Segment[] {
+  return rows.map((r, i) => ({ ...r, id: i + 1 }));
 }
 
 function bumpTime(ts: string, seconds: number): string {
-  // Parse HH:MM:SS,mmm and add seconds
   const [hms, ms = "000"] = ts.split(",");
   const [h, m, s] = hms.split(":").map(Number);
   const total = (h * 3600 + m * 60 + (s || 0) + seconds) * 1000 + parseInt(ms, 10);

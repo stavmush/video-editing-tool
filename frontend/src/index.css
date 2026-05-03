@@ -248,6 +248,38 @@ html, body {
   animation: shimmer 1.6s ease-in-out infinite;
 }
 
+/* ─── AG Grid token overrides ────────────────────────────────── */
+.ag-theme-alpine-dark.ag-editor {
+  --ag-background-color:           var(--bg-1);
+  --ag-odd-row-background-color:   var(--bg-1);
+  --ag-header-background-color:    var(--bg-1);
+  --ag-row-hover-color:            var(--bg-2);
+  --ag-selected-row-background-color: var(--accent-soft);
+  --ag-border-color:               var(--line-soft);
+  --ag-header-column-separator-color: var(--line-soft);
+  --ag-cell-horizontal-border:     solid var(--line-soft);
+  --ag-foreground-color:           var(--text-1);
+  --ag-secondary-foreground-color: var(--text-3);
+  --ag-header-foreground-color:    var(--text-3);
+  --ag-font-family:                var(--sans);
+  --ag-font-size:                  12.5px;
+  --ag-input-focus-box-shadow:     0 0 0 3px var(--accent-soft);
+  --ag-input-focus-border-color:   var(--accent);
+  --ag-range-selection-border-color: var(--accent);
+  --ag-checkbox-checked-color:     var(--accent);
+  height: 100%;
+}
+.ag-theme-alpine-dark.ag-editor .ag-header-cell-label {
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.ag-theme-alpine-dark.ag-editor .ag-row-selected {
+  background-color: var(--accent-soft) !important;
+  border-left: 2px solid var(--accent);
+}
+
 /* ─── Compat: unclassed buttons (editor rebuild in progress) ─── */
 button:not([class]) {
   display: inline-flex; align-items: center; justify-content: center;
