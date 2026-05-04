@@ -6,15 +6,17 @@ export interface ModelInfo {
   size: string;
   accuracy: string;
   speed: string;
+  cloud?: boolean;
 }
 
 export const WHISPER_MODELS: ModelInfo[] = [
-  { id: "tiny",         label: "Whisper tiny",         size: "74 MB",  accuracy: "Draft",  speed: "8×" },
-  { id: "base",         label: "Whisper base",         size: "142 MB", accuracy: "Good",   speed: "5×" },
-  { id: "small",        label: "Whisper small",        size: "466 MB", accuracy: "Better", speed: "3×" },
-  { id: "medium",       label: "Whisper medium",       size: "1.5 GB", accuracy: "Strong", speed: "1.5×" },
-  { id: "large-v3",     label: "Whisper large-v3",     size: "3.1 GB", accuracy: "Best",   speed: "1.0×" },
-  { id: "distil-large", label: "Distil-Whisper large", size: "1.5 GB", accuracy: "Strong", speed: "6×" },
+  { id: "tiny",                    label: "Whisper tiny",           size: "74 MB",    accuracy: "Draft",  speed: "8×" },
+  { id: "base",                    label: "Whisper base",           size: "142 MB",   accuracy: "Good",   speed: "5×" },
+  { id: "small",                   label: "Whisper small",          size: "466 MB",   accuracy: "Better", speed: "3×" },
+  { id: "medium",                  label: "Whisper medium",         size: "1.5 GB",   accuracy: "Strong", speed: "1.5×" },
+  { id: "large-v3",                label: "Whisper large-v3",       size: "3.1 GB",   accuracy: "Best",   speed: "1.0×" },
+  { id: "distil-large",            label: "Distil-Whisper large",   size: "1.5 GB",   accuracy: "Strong", speed: "6×" },
+  { id: "groq-whisper-large-v3",   label: "Groq · Whisper large-v3", size: "Cloud",  accuracy: "Best",   speed: "~50×", cloud: true },
 ];
 
 interface ModelPickerProps {
@@ -122,7 +124,14 @@ export default function ModelPicker({ open, current, onSelect, onClose }: ModelP
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ font: "500 13.5px/1 var(--sans)" }}>{m.label}</div>
+                  <div style={{ font: "500 13.5px/1 var(--sans)", display: "flex", alignItems: "center", gap: 6 }}>
+                    {m.label}
+                    {m.cloud && (
+                      <span className="pill" style={{ fontSize: 9, background: "var(--bg-3)", color: "var(--text-2)" }}>
+                        Cloud
+                      </span>
+                    )}
+                  </div>
                   <div
                     style={{
                       display: "flex",
@@ -135,8 +144,7 @@ export default function ModelPicker({ open, current, onSelect, onClose }: ModelP
                     <span>{m.accuracy}</span>
                     <span>·</span>
                     <span>{m.speed} realtime</span>
-                    <span>·</span>
-                    <span className="t-mono">{m.size}</span>
+                    {!m.cloud && <><span>·</span><span className="t-mono">{m.size}</span></>}
                   </div>
                 </div>
 
@@ -146,20 +154,28 @@ export default function ModelPicker({ open, current, onSelect, onClose }: ModelP
           })}
         </div>
 
-        {/* Footer warning */}
+        {/* Footer */}
         <div
           style={{
             padding: "10px 20px",
             borderTop: "1px solid var(--line-soft)",
             display: "flex",
-            alignItems: "center",
-            gap: 8,
+            flexDirection: "column",
+            gap: 6,
             color: "var(--text-3)",
             fontSize: 11.5,
           }}
         >
-          <Icon name="alert" size={12} />
-          <span>Switching models will re-transcribe the clip.</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Icon name="alert" size={12} />
+            <span>Switching models will re-transcribe the clip.</span>
+          </div>
+          {current.cloud && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="key" size={12} />
+              <span>Groq requires a <strong>GROQ_API_KEY</strong> environment variable on the backend.</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

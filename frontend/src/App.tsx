@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Session } from "./api/types";
-import { deleteSession, listSessions } from "./api/client";
+import { deleteSession, listSessions, renameSession } from "./api/client";
 import type { View } from "./components/Topbar";
 import Topbar from "./components/Topbar";
 import Sidebar from "./components/Sidebar";
@@ -31,6 +31,12 @@ export default function App() {
     setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
   }
 
+  function handleRename(id: string, name: string) {
+    renameSession(id, name)
+      .then((updated) => handleUpdate(updated))
+      .catch(() => {});
+  }
+
   function handleRemove(id: string) {
     setSessions((prev) => prev.filter((s) => s.id !== id));
     deleteSession(id).catch(() => {});
@@ -38,6 +44,17 @@ export default function App() {
       setActiveId(null);
       setView("dashboard");
     }
+  }
+
+  function handleBulkRemove(ids: string[]) {
+    setSessions((prev) => prev.filter((s) => !ids.includes(s.id)));
+    ids.forEach((id) => {
+      deleteSession(id).catch(() => {});
+      if (activeId === id) {
+        setActiveId(null);
+        setView("dashboard");
+      }
+    });
   }
 
   function openSession(id: string) {
@@ -67,6 +84,7 @@ export default function App() {
         setActiveId={setActiveId}
         view={view}
         setView={setView}
+        onBulkRemove={handleBulkRemove}
       />
       <main style={{ overflow: "hidden", position: "relative", background: "var(--bg-0)" }}>
         {loading && (
@@ -79,6 +97,8 @@ export default function App() {
             onOpen={openSession}
             onNew={() => setView("upload")}
             onRemove={handleRemove}
+            onRename={handleRename}
+            onBulkRemove={handleBulkRemove}
           />
         )}
 

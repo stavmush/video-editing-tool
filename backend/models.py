@@ -24,6 +24,7 @@ StatusType = Literal["idle", "queued", "processing", "ready", "error"]
 
 class Session(BaseModel):
     id: str
+    name: Optional[str] = None
     video_filename: Optional[str] = None
     status: StatusType = "idle"
     current_job: Optional[JobType] = None
@@ -32,10 +33,14 @@ class Session(BaseModel):
     capabilities: Capabilities = Capabilities()
 
 
+class RenameRequest(BaseModel):
+    name: str
+
+
 # ── Request bodies ─────────────────────────────────────────────────────────────
 
 class TranscribeRequest(BaseModel):
-    model_size: Literal["tiny", "base", "small", "medium", "large-v2", "large-v3"] = "small"
+    model_size: Literal["tiny", "base", "small", "medium", "large-v2", "large-v3", "groq-whisper-large-v3"] = "small"
     source_language: Optional[str] = None  # None = auto-detect
 
 
