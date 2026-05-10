@@ -4,6 +4,7 @@ import type { View } from "./Topbar";
 import ClipThumb from "./ui/ClipThumb";
 import StatusDot from "./ui/StatusDot";
 import Icon from "./ui/Icon";
+import RenameField from "./ui/RenameField";
 
 interface SidebarProps {
   sessions: Session[];
@@ -12,9 +13,10 @@ interface SidebarProps {
   view: View;
   setView: (v: View) => void;
   onBulkRemove: (ids: string[]) => void;
+  onRename: (id: string, name: string) => void;
 }
 
-export default function Sidebar({ sessions, activeId, setActiveId, view, setView, onBulkRemove }: SidebarProps) {
+export default function Sidebar({ sessions, activeId, setActiveId, view, setView, onBulkRemove, onRename }: SidebarProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showConfirm, setShowConfirm] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
@@ -112,6 +114,7 @@ export default function Sidebar({ sessions, activeId, setActiveId, view, setView
             anySelected={selectedIds.size > 0}
             onOpen={() => { setActiveId(s.id); setView("editor"); }}
             onSelect={(checked) => toggleSelect(s.id, checked)}
+            onRename={(name) => onRename(s.id, name)}
           />
         ))}
       </div>
@@ -155,6 +158,7 @@ function SidebarRow({
   anySelected,
   onOpen,
   onSelect,
+  onRename,
 }: {
   session: Session;
   active: boolean;
@@ -162,6 +166,7 @@ function SidebarRow({
   anySelected: boolean;
   onOpen: () => void;
   onSelect: (checked: boolean) => void;
+  onRename: (name: string) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const showCheckbox = hovered || anySelected || selected;
@@ -211,17 +216,13 @@ function SidebarRow({
       </div>
 
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div
-          style={{
-            font: "500 12.5px/1.25 var(--sans)",
-            color: "var(--text-1)",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {s.name ?? s.video_filename ?? "Untitled"}
-        </div>
+        <RenameField
+          value={s.name}
+          fallback={s.video_filename}
+          onSave={onRename}
+          disabled={anySelected}
+          style={{ maxWidth: "100%" }}
+        />
         <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 3 }}>
           <StatusDot status={s.status} showLabel={false} />
           <span style={{ font: "11px var(--sans)", color: "var(--text-3)" }}>{s.status}</span>
