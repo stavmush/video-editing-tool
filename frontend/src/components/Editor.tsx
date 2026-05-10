@@ -23,6 +23,7 @@ import CueRail from "./CueRail";
 import WaveformStrip from "./WaveformStrip";
 import StatusDot from "./ui/StatusDot";
 import Icon from "./ui/Icon";
+import RenameField from "./ui/RenameField";
 import { timestampToSeconds } from "../utils/time";
 import type { SubtitleView } from "./TweaksPanel";
 
@@ -41,6 +42,7 @@ interface EditorProps {
   session: Session;
   onUpdate: (s: Session) => void;
   onRemove: (id: string) => void;
+  onRename?: (id: string, name: string) => void;
   showWaveform?: boolean;
   subtitleView?: SubtitleView;
   showAI?: boolean;
@@ -66,6 +68,7 @@ export default function Editor({
   session,
   onUpdate,
   onRemove,
+  onRename,
   showWaveform = false,
   subtitleView = "grid",
   showAI = false,
@@ -222,9 +225,12 @@ export default function Editor({
       >
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ font: "500 15px/1 var(--sans)", color: "var(--text-1)" }}>
-              {s.video_filename ?? "Untitled session"}
-            </span>
+            <RenameField
+              value={s.name}
+              fallback={s.video_filename}
+              onSave={(name) => onRename?.(s.id, name)}
+              font="500 15px/1 var(--sans)"
+            />
             <span className="t-mono" style={{ color: "var(--text-3)", fontSize: 11.5 }}>
               · {s.video_filename ?? "—"}
             </span>

@@ -85,6 +85,7 @@ export default function App() {
         view={view}
         setView={setView}
         onBulkRemove={handleBulkRemove}
+        onRename={handleRename}
       />
       <main style={{ overflow: "hidden", position: "relative", background: "var(--bg-0)" }}>
         {loading && (
@@ -117,6 +118,7 @@ export default function App() {
             session={activeSession}
             onUpdate={handleUpdate}
             onRemove={handleRemove}
+            onRename={handleRename}
             showWaveform={showWaveform}
             subtitleView={subtitleView}
             showAI={showAI}
