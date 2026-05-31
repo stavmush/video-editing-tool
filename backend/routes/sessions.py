@@ -8,7 +8,7 @@ from models import RenameRequest
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
-ALLOWED_EXTENSIONS = {".mp4", ".mkv", ".avi", ".mov"}
+ALLOWED_EXTENSIONS = {".mp4", ".mkv", ".avi", ".mov", ".webm"}
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024 * 1024  # 10 GB
 
 
@@ -38,14 +38,16 @@ async def upload_video(session_id: str, file: UploadFile = File(...), extract_su
 
     # Transcode non-MP4 uploads to MP4 so the browser can play the preview.
     if ext != ".mp4":
-        import subprocess
+        import asyncio
         mp4_path = os.path.join(data["session_dir"], "video.mp4")
-        result = subprocess.run(
-            ["ffmpeg", "-y", "-i", upload_path, "-c:v", "libx264", "-crf", "18",
-             "-preset", "fast", "-c:a", "aac", "-movflags", "+faststart", mp4_path],
-            capture_output=True,
+        proc = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-y", "-i", upload_path, "-c:v", "libx264", "-crf", "18",
+            "-preset", "fast", "-c:a", "aac", "-movflags", "+faststart", mp4_path,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
         )
-        if result.returncode == 0:
+        returncode = await proc.wait()
+        if returncode == 0:
             os.remove(upload_path)
             video_path = mp4_path
         else:

@@ -26,9 +26,12 @@ interface UploadState {
 export default function UploadFlow({ onCancel, onDone }: UploadFlowProps) {
   const [mode, setMode] = useState<UploadMode>("video");
   const [dragging, setDragging] = useState(false);
+  const [draggingSrt, setDraggingSrt] = useState(false);
   const [uploading, setUploading] = useState<UploadState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingSession, setPendingSession] = useState<Session | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const srtRef = useRef<HTMLInputElement>(null);
 
   const isSrtMode = mode === "srt-only";
 
@@ -40,6 +43,16 @@ export default function UploadFlow({ onCancel, onDone }: UploadFlowProps) {
       let updated: Session;
       if (isSrtMode) {
         updated = await uploadSrt(session.id, file);
+        onDone(updated);
+      } else if (mode === "video-with-srt") {
+        updated = await uploadVideo(
+          session.id,
+          file,
+          (pct) => setUploading((prev) => (prev ? { ...prev, pct } : null)),
+          false,
+        );
+        setUploading(null);
+        setPendingSession(updated);
       } else {
         updated = await uploadVideo(
           session.id,
@@ -47,10 +60,23 @@ export default function UploadFlow({ onCancel, onDone }: UploadFlowProps) {
           (pct) => setUploading((prev) => (prev ? { ...prev, pct } : null)),
           mode === "video-with-subs",
         );
+        onDone(updated);
       }
-      onDone(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
+      setUploading(null);
+    }
+  }
+
+  async function handleSrtFile(file: File) {
+    if (!pendingSession) return;
+    setError(null);
+    setUploading({ name: file.name, size: file.size, pct: 1 });
+    try {
+      const updated = await uploadSrt(pendingSession.id, file);
+      onDone(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "SRT upload failed");
       setUploading(null);
     }
   }
@@ -60,6 +86,13 @@ export default function UploadFlow({ onCancel, onDone }: UploadFlowProps) {
     setDragging(false);
     const file = e.dataTransfer.files[0];
     if (file) void handleFile(file);
+  }
+
+  function onDropSrt(e: React.DragEvent) {
+    e.preventDefault();
+    setDraggingSrt(false);
+    const file = e.dataTransfer.files[0];
+    if (file) void handleSrtFile(file);
   }
 
   return (
@@ -132,90 +165,139 @@ export default function UploadFlow({ onCancel, onDone }: UploadFlowProps) {
         })}
       </div>
 
-      {/* Hidden file input */}
+      {/* Hidden file inputs */}
       <input
         ref={fileRef}
         type="file"
-        accept={isSrtMode ? ".srt" : "video/*,.mkv"}
+        accept={isSrtMode ? ".srt" : "video/*,.mkv,.webm"}
         style={{ display: "none" }}
         onChange={(e) => {
           const f = e.target.files?.[0];
           if (f) void handleFile(f);
+          if (fileRef.current) fileRef.current.value = "";
+        }}
+      />
+      <input
+        ref={srtRef}
+        type="file"
+        accept=".srt"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void handleSrtFile(f);
+          if (srtRef.current) srtRef.current.value = "";
         }}
       />
 
-      {/* Drop zone */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={onDrop}
-        className="dotted"
-        style={{
-          border: "1.5px dashed " + (dragging ? "var(--accent)" : "var(--line)"),
-          borderRadius: 14,
-          padding: "56px 32px",
-          textAlign: "center",
-          background: dragging ? "var(--accent-soft)" : "var(--bg-1)",
-          transition: "border-color 0.15s, background 0.15s",
-        }}
-      >
-        {!uploading ? (
-          <>
-            <div
-              style={{
-                display: "inline-flex",
-                padding: 14,
-                borderRadius: 999,
-                background: "var(--bg-2)",
-                color: "var(--accent)",
-                marginBottom: 14,
-              }}
-            >
-              <Icon name="upload" size={22} />
-            </div>
-            <div className="t-h2" style={{ margin: "4px 0" }}>Drop your file here</div>
-            <p style={{ color: "var(--text-3)", margin: "4px 0 16px", fontSize: 13 }}>
-              {isSrtMode
-                ? "SRT files only"
-                : "MP4, MOV, MKV, WebM up to 4 GB · or SRT for subtitle-only"}
-            </p>
-            <button className="btn primary" onClick={() => fileRef.current?.click()}>
-              Choose a file
-            </button>
-          </>
-        ) : (
-          <div style={{ maxWidth: 380, margin: "0 auto" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                marginBottom: 12,
-                justifyContent: "center",
-              }}
-            >
-              <Icon name="film" size={18} />
-              <span className="t-mono">{uploading.name}</span>
-              <span className="t-caption">· {formatSize(uploading.size)}</span>
-            </div>
-            <div className="bar" style={{ height: 6 }}>
-              <i style={{ width: `${Math.round(uploading.pct * 100)}%` }} />
-            </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginTop: 8,
-                fontSize: 12,
-                color: "var(--text-3)",
-              }}
-            >
-              <span>Uploading…</span>
-              <span className="t-mono">{Math.round(uploading.pct * 100)}%</span>
-            </div>
+      {/* Phase 2: SRT drop zone (video-with-srt after video uploaded) */}
+      {pendingSession ? (
+        <div>
+          <div
+            style={{
+              marginBottom: 16,
+              padding: "10px 14px",
+              borderRadius: 8,
+              background: "oklch(72% 0.14 155 / 0.08)",
+              color: "var(--ok)",
+              fontSize: 13,
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+            }}
+          >
+            <Icon name="check" size={14} /> Video uploaded — now add your SRT file
           </div>
-        )}
-      </div>
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDraggingSrt(true); }}
+            onDragLeave={() => setDraggingSrt(false)}
+            onDrop={onDropSrt}
+            className="dotted"
+            style={{
+              border: "1.5px dashed " + (draggingSrt ? "var(--accent)" : "var(--line)"),
+              borderRadius: 14,
+              padding: "56px 32px",
+              textAlign: "center",
+              background: draggingSrt ? "var(--accent-soft)" : "var(--bg-1)",
+              transition: "border-color 0.15s, background 0.15s",
+            }}
+          >
+            {!uploading ? (
+              <>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    padding: 14,
+                    borderRadius: 999,
+                    background: "var(--bg-2)",
+                    color: "var(--accent)",
+                    marginBottom: 14,
+                  }}
+                >
+                  <Icon name="upload" size={22} />
+                </div>
+                <div className="t-h2" style={{ margin: "4px 0" }}>Drop your SRT here</div>
+                <p style={{ color: "var(--text-3)", margin: "4px 0 16px", fontSize: 13 }}>
+                  SRT subtitle file
+                </p>
+                <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+                  <button className="btn primary" onClick={() => srtRef.current?.click()}>
+                    Choose SRT file
+                  </button>
+                  <button className="btn ghost" onClick={() => onDone(pendingSession)}>
+                    Skip, open without subtitles
+                  </button>
+                </div>
+              </>
+            ) : (
+              <UploadProgress uploading={uploading} />
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Phase 1: main drop zone */
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={onDrop}
+          className="dotted"
+          style={{
+            border: "1.5px dashed " + (dragging ? "var(--accent)" : "var(--line)"),
+            borderRadius: 14,
+            padding: "56px 32px",
+            textAlign: "center",
+            background: dragging ? "var(--accent-soft)" : "var(--bg-1)",
+            transition: "border-color 0.15s, background 0.15s",
+          }}
+        >
+          {!uploading ? (
+            <>
+              <div
+                style={{
+                  display: "inline-flex",
+                  padding: 14,
+                  borderRadius: 999,
+                  background: "var(--bg-2)",
+                  color: "var(--accent)",
+                  marginBottom: 14,
+                }}
+              >
+                <Icon name="upload" size={22} />
+              </div>
+              <div className="t-h2" style={{ margin: "4px 0" }}>Drop your file here</div>
+              <p style={{ color: "var(--text-3)", margin: "4px 0 16px", fontSize: 13 }}>
+                {isSrtMode
+                  ? "SRT files only"
+                  : "MP4, MOV, MKV, WebM up to 4 GB · or SRT for subtitle-only"}
+              </p>
+              <button className="btn primary" onClick={() => fileRef.current?.click()}>
+                Choose a file
+              </button>
+            </>
+          ) : (
+            <UploadProgress uploading={uploading} />
+          )}
+        </div>
+      )}
 
       {error && (
         <div
@@ -234,6 +316,41 @@ export default function UploadFlow({ onCancel, onDone }: UploadFlowProps) {
           <Icon name="alert" size={14} /> {error}
         </div>
       )}
+    </div>
+  );
+}
+
+function UploadProgress({ uploading }: { uploading: UploadState }) {
+  return (
+    <div style={{ maxWidth: 380, margin: "0 auto" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 12,
+          justifyContent: "center",
+        }}
+      >
+        <Icon name="film" size={18} />
+        <span className="t-mono">{uploading.name}</span>
+        <span className="t-caption">· {formatSize(uploading.size)}</span>
+      </div>
+      <div className="bar" style={{ height: 6 }}>
+        <i style={{ width: `${Math.round(uploading.pct * 100)}%` }} />
+      </div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginTop: 8,
+          fontSize: 12,
+          color: "var(--text-3)",
+        }}
+      >
+        <span>Uploading…</span>
+        <span className="t-mono">{Math.round(uploading.pct * 100)}%</span>
+      </div>
     </div>
   );
 }
